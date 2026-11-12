@@ -62,3 +62,8 @@ scripts/adb-ui.sh prep; scripts/adb-ui.sh tap "Ajustes"; scripts/adb-ui.sh shot 
 Verificado: migración Room 1→2 (la app abre), búsqueda y reproducción SoundCloud (HLS), búsqueda Bandcamp, descarga de álbum Bandcamp (18 MP3; `ffmpeg -i` muestra título/artista/álbum/pista y carátula 544×544),
 notificación de descarga («10 % · 1/18 canciones»), historial, crear playlist propia, cola reordenable (`adb shell input draganddrop x y x2 y2 1500`), limpiar Recientes (`KEYCODE_APP_SWITCH` + swipe → sin sesión ni proceso).
 Pruebas unitarias: 14 (`DownloadLogicTest` 6 + `MultiServiceTest` 8). Descarga SoundCloud (HLS AAC fMP4 → M4A) verificada con ffmpeg. Pendiente: enlaces SC/BC pegados, sincronizar playlists de esos servicios, pausa con audífonos (dispositivo real).
+
+## v1.02 (emulador API 36, debug)
+Verificado: filtro Artistas (Coldplay, Avicii…), perfil con foto/descripción/secciones, búsqueda dentro del artista («yellow»), «Ver álbum» y «Ver artista» desde el reproductor, letra sincronizada de LRCLIB con línea activa resaltada, Limpiar caché (4,6 MB → vacía), versión instalada 1.02 en Ajustes.
+Pruebas unitarias: 19 (`V102Test`: LRC, línea activa, comparación de versiones). Nota: sin `keystore.properties` en esa máquina el release sale sin firmar; el emulador tenía la v1.01 firmada, así que se desinstaló antes de instalar el debug.
+Sin probar: aviso de actualización con un release más nuevo publicado (la API responde, pero aún no existe v1.02 en GitHub), «Borrar datos de la app», búsqueda en Biblioteca y deduplicado del historial (solo compilados/lógica).

@@ -118,3 +118,10 @@ RGB565 en equipos `isLowRamDevice`; la posición de reproducción se observa sol
 - **UI:** `UserPlaylistScreen`, `HistoryScreen` (`feature:library`, rutas `UserPlaylistRoute`/`HistoryRoute`), `Reorderable.kt` y `PlaylistDialogs.kt` (`core:designsystem`), chips de servicio en `SearchScreen`.
 - **Historial:** `PlaybackService.recordHistory()` en `onIsPlayingChanged`/`onMediaItemTransition` si `AppSettings.savePlayHistory`.
 - **Descargas:** progreso agregado (`PlaylistSyncer.sync(onProgress(done,total,fraction))`) → notificación con % y conteo.
+
+## Novedades v1.02
+- **Artistas:** `ArtistRoute`, `ArtistScreen`/`ArtistViewModel` (`feature:streaming`), `ArtistProfile`/`ArtistSection` (`core:model`), `YoutubeService.artist/artistItems/findArtistUrl/findAlbumUrl`, `StreamingRepository` los expone. Los resultados de canal (`ItemType.CHANNEL`) solo aparecen con el filtro Artistas.
+- **Reproductor:** menú «Ver artista / Ver álbum» (`PlayerViewModel.Event` → rutas) y panel de letra (`LyricsPanel`, solo recompone al cambiar la línea activa). `LyricsRepository` + `Lyrics` (parser LRC y búsqueda binaria de línea activa).
+- **Biblioteca:** búsqueda local (canciones, playlists, listas propias) en `LibraryScreen`.
+- **Ajustes:** sección Almacenamiento (`MaintenanceRepository`, `clearImageCache` en `core:designsystem`) y Actualizaciones (`UpdateRepository`, `AppSettings.checkForUpdates/dismissedUpdateVersion`).
+- **Historial:** una fila por canción (ver DECISIONS 24).

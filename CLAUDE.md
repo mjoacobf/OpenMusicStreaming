@@ -8,10 +8,10 @@ Sin cuentas ni inicio de sesión. Licencia **GPLv3** (usa NewPipeExtractor y có
 **Usuario:** hispanohablante; prefiere respuestas directas y verificadas (probó todo en emulador antes de dar por bueno).
 
 ## Estado
-- **v1.01** (`versionCode 2`, «Open Music Streaming») implementada y probada en emulador API 36 (release firmado ~4,3 MB). Detalle y huecos de verificación en `docs/ROADMAP.md`.
-- Rama de trabajo: `feat/app-inicial` (sobre `main`, aún sin fusionar). **Los cambios de la v1.01 están sin commitear**: no commitear sin que lo pidan.
-- Novedades: SoundCloud/Bandcamp (ids `sc:`/`bc:`), playlists propias, historial, cola arrastrable, notificación con %, cierre al limpiar Recientes, Room v2.
-- Sin commitear y **del usuario (no tocar)**: `ObservacionesYNuevasCaracteristicas.md`, `branding/`, íconos del launcher.
+- **v1.02** (`versionCode 3`): artistas, letras (LRCLIB, experimental), ver artista/álbum, búsqueda en biblioteca, limpiar caché/datos, aviso de actualización, historial sin duplicados. Antes: **v1.01** (`versionCode 2`), probada en emulador API 36 (release firmado ~4,3 MB). Detalle y huecos de verificación en `docs/ROADMAP.md`.
+- La v1.01 ya está fusionada en `main`. La v1.02 se trabaja en la rama `feat/v1.02`. No fusionar a `main` sin que lo pidan.
+- Novedades v1.01: SoundCloud/Bandcamp (ids `sc:`/`bc:`), playlists propias, historial, cola arrastrable, notificación con %, cierre al limpiar Recientes, Room v2.
+- **Del usuario (no tocar ni commitear)**: `obs.md` (notas de trabajo), `.idea/`, `gradle.properties` con cambios locales.
 
 ## Documentación (leer bajo demanda, no al inicio)
 | Archivo | Contenido |
@@ -45,7 +45,7 @@ graphify god-nodes --top 15                  # núcleos de la arquitectura
 ```
 ./gradlew :app:assembleDebug                  # APK debug (~29 MB) → app/build/outputs/apk/debug/
 ./gradlew :app:assembleRelease                # release + R8 firmado → app/build/outputs/apk/release/app-release.apk
-./gradlew :core:download:testDebugUnitTest    # pruebas unitarias (14)
+./gradlew :core:download:testDebugUnitTest    # pruebas unitarias (19)
 ./gradlew :<modulo>:compileDebugKotlin -q     # compilación rápida de un módulo
 ```
 Entorno: Windows 11, Git Bash. JDK 25, Gradle 9.5.0, AGP 9.3.3 (Kotlin integrado: **no** aplicar `kotlin-android`),
