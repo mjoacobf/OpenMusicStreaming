@@ -10,6 +10,7 @@ import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.StreamingService
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
@@ -66,6 +67,7 @@ internal fun InfoItem.toSummary(filter: SearchFilter? = null): MediaSummary? = w
                 subtitle = cleanArtist(uploaderName),
                 thumbnailUrl = thumbnails.pickUrl(THUMB_LIST),
                 durationSec = duration,
+                artistUrl = uploaderUrl?.takeIf { it.isNotBlank() },
             )
         }
     }
@@ -84,10 +86,34 @@ internal fun InfoItem.toSummary(filter: SearchFilter? = null): MediaSummary? = w
             subtitle = cleanArtist(uploaderName),
             thumbnailUrl = thumbnails.pickUrl(THUMB_LIST),
             itemCount = streamCount,
+            artistUrl = uploaderUrl?.takeIf { it.isNotBlank() },
         )
     }
 
-    else -> null // canales y otros tipos no se muestran
+    // Los artistas solo se muestran al buscarlos explícitamente
+    is ChannelInfoItem -> if (filter == SearchFilter.MUSIC_ARTISTS) {
+        MediaSummary(
+            url = url,
+            id = url,
+            type = ItemType.CHANNEL,
+            title = cleanArtist(name),
+            subtitle = subscriberLabel(subscriberCount),
+            thumbnailUrl = thumbnails.pickUrl(THUMB_LIST),
+            artistUrl = url,
+        )
+    } else {
+        null
+    }
+
+    else -> null // otros tipos no se muestran
+}
+
+/** "1,2 M suscriptores" (vacío si el servicio no informa la cifra). */
+internal fun subscriberLabel(count: Long): String = when {
+    count < 0 -> ""
+    count >= 1_000_000 -> "%.1f M suscriptores".format(count / 1_000_000.0)
+    count >= 1_000 -> "%.1f K suscriptores".format(count / 1_000.0)
+    else -> "$count suscriptores"
 }
 
 /** Ancho de las miniaturas de lista; Coil las reduce al tamaño real de la vista. */

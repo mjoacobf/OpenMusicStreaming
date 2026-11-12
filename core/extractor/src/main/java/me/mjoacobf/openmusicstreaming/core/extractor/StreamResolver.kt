@@ -54,6 +54,9 @@ class StreamResolver {
 
     fun cached(videoId: String): StreamInfo? = cache.get(videoId)?.info
 
+    /** Olvida todas las URLs resueltas (Limpiar caché). */
+    fun clear() = cache.evictAll()
+
     fun invalidate(videoId: String) {
         cache.remove(videoId)
     }

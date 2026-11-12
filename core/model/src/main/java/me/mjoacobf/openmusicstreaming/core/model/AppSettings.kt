@@ -54,6 +54,11 @@ data class AppSettings(
     val shuffle: Boolean = false,
     val repeatMode: RepeatModeSetting = RepeatModeSetting.OFF,
     val previousRestartsAfterSec: Int = 3,
+
+    // Actualizaciones de la app
+    val checkForUpdates: Boolean = true,
+    /** Última versión que el usuario rechazó (no se vuelve a avisar de esa). */
+    val dismissedUpdateVersion: String = "",
 ) {
     companion object {
         val json = Json {

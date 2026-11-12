@@ -67,8 +67,16 @@ interface UserPlaylistDao {
 
 @Dao
 interface PlayHistoryDao {
-    @Query("SELECT * FROM play_history ORDER BY playedAt DESC, id DESC LIMIT :limit")
+    /** Una fila por canción (la reproducción más reciente), de más reciente a más antigua. */
+    @Query(
+        "SELECT * FROM play_history WHERE id IN (SELECT MAX(id) FROM play_history GROUP BY itemId) " +
+            "ORDER BY playedAt DESC, id DESC LIMIT :limit",
+    )
     fun observe(limit: Int): Flow<List<PlayHistoryEntity>>
+
+    /** Quita reproducciones anteriores de la misma canción antes de registrar la nueva. */
+    @Query("DELETE FROM play_history WHERE itemId = :itemId")
+    suspend fun deleteByItem(itemId: String)
 
     @Insert
     suspend fun insert(entry: PlayHistoryEntity)
@@ -80,7 +88,8 @@ interface PlayHistoryDao {
     )
     suspend fun trim(keep: Int)
 
-    @Query("DELETE FROM play_history WHERE id = :id")
+    /** Borra la canción del historial (todas sus filas, también las duplicadas de versiones anteriores). */
+    @Query("DELETE FROM play_history WHERE itemId = (SELECT itemId FROM play_history WHERE id = :id)")
     suspend fun delete(id: Long)
 
     @Query("DELETE FROM play_history")

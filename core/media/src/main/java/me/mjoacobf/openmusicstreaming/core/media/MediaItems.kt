@@ -20,6 +20,7 @@ object MediaIds {
     const val VIDEO = "ytv:"
     const val EXTRA_DURATION = "oms.duration"
     const val EXTRA_URL = "oms.url"
+    const val EXTRA_ARTIST_URL = "oms.artistUrl"
 
     fun videoId(mediaId: String): String = mediaId.substringAfter(':')
     fun isStreaming(mediaId: String) = mediaId.startsWith(STREAM) || mediaId.startsWith(VIDEO)
@@ -33,6 +34,7 @@ private fun metadata(
     artwork: String?,
     durationSec: Long,
     url: String,
+    artistUrl: String? = null,
 ): MediaMetadata = MediaMetadata.Builder()
     .setTitle(title)
     .setArtist(artist)
@@ -44,6 +46,7 @@ private fun metadata(
         Bundle().apply {
             putLong(MediaIds.EXTRA_DURATION, durationSec)
             putString(MediaIds.EXTRA_URL, url)
+            artistUrl?.let { putString(MediaIds.EXTRA_ARTIST_URL, it) }
         },
     )
     .build()
@@ -59,7 +62,7 @@ fun Song.toMediaItem(): MediaItem = MediaItem.Builder()
 
 fun MediaSummary.toMediaItem(asVideo: Boolean = false): MediaItem = MediaItem.Builder()
     .setMediaId((if (asVideo) MediaIds.VIDEO else MediaIds.STREAM) + id)
-    .setMediaMetadata(metadata(title, subtitle, null, thumbnailUrl, durationSec, url))
+    .setMediaMetadata(metadata(title, subtitle, null, thumbnailUrl, durationSec, url, artistUrl))
     .build()
 
 val MediaItem.videoId: String get() = MediaIds.videoId(mediaId)
@@ -75,5 +78,6 @@ fun MediaItem.toSummary(): MediaSummary? {
         subtitle = mediaMetadata.artist?.toString().orEmpty(),
         thumbnailUrl = mediaMetadata.artworkUri?.toString(),
         durationSec = mediaMetadata.extras?.getLong(MediaIds.EXTRA_DURATION) ?: -1,
+        artistUrl = mediaMetadata.extras?.getString(MediaIds.EXTRA_ARTIST_URL),
     )
 }
