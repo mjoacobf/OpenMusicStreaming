@@ -24,6 +24,14 @@ data object SettingsRoute : TopLevelRoute
 @Serializable
 data class LocalPlaylistRoute(val playlistId: Long) : NavKey
 
+/** Playlist creada por el usuario (streaming y/o descargadas). */
+@Serializable
+data class UserPlaylistRoute(val playlistId: Long) : NavKey
+
+/** Historial de reproducción. */
+@Serializable
+data object HistoryRoute : NavKey
+
 /** Lista de todas las canciones descargadas. */
 @Serializable
 data object AllSongsRoute : NavKey
