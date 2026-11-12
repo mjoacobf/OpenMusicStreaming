@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
+import me.mjoacobf.openmusicstreaming.core.data.PlayHistoryRepository
 import me.mjoacobf.openmusicstreaming.core.data.StreamingRepository
 import me.mjoacobf.openmusicstreaming.core.download.DownloadManager
 import me.mjoacobf.openmusicstreaming.core.model.AppSettings
@@ -19,6 +20,7 @@ class SettingsViewModel(
     private val repository: SettingsRepository,
     private val streaming: StreamingRepository,
     private val downloads: DownloadManager,
+    private val playHistory: PlayHistoryRepository,
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> =
@@ -41,7 +43,12 @@ class SettingsViewModel(
 
     fun clearHistory() = viewModelScope.launch {
         streaming.clearHistory()
-        _messages.tryEmit("Historial borrado")
+        _messages.tryEmit("Historial de búsqueda borrado")
+    }
+
+    fun clearPlayHistory() = viewModelScope.launch {
+        playHistory.clear()
+        _messages.tryEmit("Historial de reproducción borrado")
     }
 
     fun export(uri: Uri) = viewModelScope.launch {

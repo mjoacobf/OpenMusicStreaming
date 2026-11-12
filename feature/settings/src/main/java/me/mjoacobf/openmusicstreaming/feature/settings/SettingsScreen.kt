@@ -154,6 +154,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 s.pauseOnAudioDeviceChange,
             ) { v -> update { it.copy(pauseOnAudioDeviceChange = v) } }
             SwitchSetting("Saltar silencios", null, s.skipSilence) { v -> update { it.copy(skipSilence = v) } }
+            SwitchSetting(
+                "Guardar historial de reproducción",
+                "Registra las canciones que escuchas (se ve desde Biblioteca)",
+                s.savePlayHistory,
+            ) { v -> update { it.copy(savePlayHistory = v) } }
+            ClickSetting("Borrar historial de reproducción", null, onClick = viewModel::clearPlayHistory)
 
             SectionHeader("Copia de seguridad")
             ClickSetting("Exportar configuración", "Guarda los ajustes en un archivo JSON") {
@@ -165,7 +171,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
             SectionHeader("Acerca de")
             Text(
-                "OpenMusicStreaming usa NewPipeExtractor (GPLv3) y código adaptado de NewPipe. " +
+                "Open Music Streaming usa NewPipeExtractor (GPLv3) y código adaptado de NewPipe para YouTube Music, " +
+                    "SoundCloud y Bandcamp. " +
                     "No requiere cuenta ni inicio de sesión.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
