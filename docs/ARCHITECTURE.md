@@ -125,3 +125,6 @@ RGB565 en equipos `isLowRamDevice`; la posición de reproducción se observa sol
 - **Biblioteca:** búsqueda local (canciones, playlists, listas propias) en `LibraryScreen`.
 - **Ajustes:** sección Almacenamiento (`MaintenanceRepository`, `clearImageCache` en `core:designsystem`) y Actualizaciones (`UpdateRepository`, `AppSettings.checkForUpdates/dismissedUpdateVersion`).
 - **Historial:** una fila por canción (ver DECISIONS 24).
+
+## Novedades v1.021
+- **Analizar carpeta de descargas:** `LibraryScanner` + `TagUrl` (`core:download`), diálogo `ScanDialog` y menú ⋮ en `LibraryScreen`; `LibraryViewModel.scan` (estado) usa `SettingsRepository.downloadTreeUri`. Ver DECISIONS 30.

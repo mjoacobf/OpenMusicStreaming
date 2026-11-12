@@ -1,5 +1,8 @@
 # Hoja de ruta
 
+## Versión 1.021 — IMPLEMENTADA
+Analizar la carpeta de descargas desde Biblioteca (⋮) para recuperar las canciones tras reinstalar la app. Probada en emulador. `versionName 1.021`, `versionCode 4`. Pendiente: reconstruir playlists (no hay forma fiable en los archivos).
+
 ## Versión 1.02 — IMPLEMENTADA (emulador API 36, debug)
 | Ítem | Resultado |
 |---|---|
