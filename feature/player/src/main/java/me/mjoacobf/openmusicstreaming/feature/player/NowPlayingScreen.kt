@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,8 +24,9 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -71,11 +72,15 @@ import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import me.mjoacobf.openmusicstreaming.core.designsystem.Artwork
 import me.mjoacobf.openmusicstreaming.core.designsystem.EmptyState
+import me.mjoacobf.openmusicstreaming.core.designsystem.AddToPlaylistDialog
 import me.mjoacobf.openmusicstreaming.core.designsystem.MediaRow
+import me.mjoacobf.openmusicstreaming.core.designsystem.reorderable
+import me.mjoacobf.openmusicstreaming.core.designsystem.rememberReorderableState
 import me.mjoacobf.openmusicstreaming.core.media.MediaIds
 import me.mjoacobf.openmusicstreaming.core.media.PlayerState
 import me.mjoacobf.openmusicstreaming.core.model.formatDuration
-import me.mjoacobf.openmusicstreaming.feature.player.PlayerViewModel.Companion.toSummary
+import me.mjoacobf.openmusicstreaming.core.media.toSummary
+import me.mjoacobf.openmusicstreaming.core.model.upscaleThumbnail
 
 @kotlin.OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +89,8 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val bookmarked by viewModel.bookmarkedUrls.collectAsStateWithLifecycle()
     var showQueue by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val item = state.currentItem
 
     // En segundo plano se desactiva la pista de video para ahorrar datos y batería
@@ -115,6 +122,9 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
                             )
                         }
                     }
+                    if (item?.toSummary() != null) {
+                        IconButton(onClick = { showAddToPlaylist = true }) { Icon(Icons.Rounded.PlaylistAdd, "Añadir a playlist") }
+                    }
                     IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Cola") }
                 },
             )
@@ -141,7 +151,7 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
                     VideoSurface(viewModel.connection.player)
                 } else {
                     Artwork(
-                        item.mediaMetadata.artworkUri?.toString(),
+                        upscaleThumbnail(item.mediaMetadata.artworkUri?.toString(), 1080),
                         Modifier.fillMaxWidth().widthIn(max = 420.dp).aspectRatio(1f),
                         size = Dp.Unspecified,
                         shape = RoundedCornerShape(16.dp),
@@ -188,6 +198,16 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
             }
         }
+    }
+
+    if (showAddToPlaylist && item != null) {
+        val dismiss = { showAddToPlaylist = false }
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onPick = { viewModel.addToPlaylist(it.id, item); dismiss() },
+            onCreate = { viewModel.createPlaylistWith(it, item); dismiss() },
+            onDismiss = dismiss,
+        )
     }
 
     if (showQueue) {
@@ -273,30 +293,59 @@ private fun Controls(state: PlayerState, viewModel: PlayerViewModel) {
     }
 }
 
+/** Elemento de la cola con una clave única aunque la misma canción esté repetida. */
+private class QueueEntry(val key: String, val item: androidx.media3.common.MediaItem)
+
+/**
+ * Cola de reproducción: un toque reproduce ese elemento y, manteniendo presionado y arrastrando,
+ * se reordena (el gesto lo gestiona [reorderable]); la X quita el elemento.
+ */
 @Composable
 private fun QueueList(state: PlayerState, viewModel: PlayerViewModel) {
+    val entries = remember(state.queue) {
+        val seen = HashMap<String, Int>()
+        state.queue.map { item ->
+            val n = seen.merge(item.mediaId, 1, Int::plus)!!
+            QueueEntry("${item.mediaId}#$n", item)
+        }
+    }
+    val currentKey = entries.getOrNull(state.currentIndex)?.key
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = state.currentIndex.coerceAtLeast(0))
+    val reorder = rememberReorderableState(
+        source = entries,
+        key = { it.key },
+        listState = listState,
+        onCommit = { from, to -> viewModel.move(from, to) },
+    )
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Text("Cola (${state.queue.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         TextButton(onClick = viewModel::clearQueue) { Text("Vaciar") }
     }
+    Text(
+        "Mantén presionado y arrastra para reordenar",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
     LazyColumn(state = listState, modifier = Modifier.fillMaxHeight(0.8f)) {
-        itemsIndexed(state.queue, key = { i, it -> "$i-${it.mediaId}" }, contentType = { _, _ -> "queue" }) { index, item ->
+        items(reorder.items, key = { it.key }, contentType = { "queue" }) { entry ->
             MediaRow(
-                title = item.mediaMetadata.title?.toString().orEmpty(),
-                subtitle = item.mediaMetadata.artist?.toString().orEmpty(),
-                thumbnailUrl = item.mediaMetadata.artworkUri?.toString(),
-                highlighted = index == state.currentIndex,
+                title = entry.item.mediaMetadata.title?.toString().orEmpty(),
+                subtitle = entry.item.mediaMetadata.artist?.toString().orEmpty(),
+                thumbnailUrl = entry.item.mediaMetadata.artworkUri?.toString(),
+                modifier = reorderable(reorder, entry.key),
+                highlighted = entry.key == currentKey,
                 leadingSize = 44.dp,
-                onClick = { viewModel.skipTo(index) },
+                onClick = { viewModel.skipTo(reorder.items.indexOf(entry)) },
             ) {
-                IconButton(onClick = { viewModel.move(index, index - 1) }, enabled = index > 0) {
-                    Icon(Icons.Rounded.KeyboardArrowUp, "Subir")
+                Icon(
+                    Icons.Rounded.DragHandle, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+                IconButton(onClick = { viewModel.removeAt(reorder.items.indexOf(entry)) }) {
+                    Icon(Icons.Rounded.Close, "Quitar")
                 }
-                IconButton(onClick = { viewModel.move(index, index + 1) }, enabled = index < state.queue.size - 1) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, "Bajar")
-                }
-                IconButton(onClick = { viewModel.removeAt(index) }) { Icon(Icons.Rounded.Close, "Quitar") }
             }
         }
     }

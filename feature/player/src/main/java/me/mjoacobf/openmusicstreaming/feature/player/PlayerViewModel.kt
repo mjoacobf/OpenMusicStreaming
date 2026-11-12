@@ -9,18 +9,30 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.BookmarkRepository
 import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
-import me.mjoacobf.openmusicstreaming.core.media.MediaIds
+import me.mjoacobf.openmusicstreaming.core.data.UserPlaylistRepository
 import me.mjoacobf.openmusicstreaming.core.media.PlayerConnection
 import me.mjoacobf.openmusicstreaming.core.media.PlayerState
+import me.mjoacobf.openmusicstreaming.core.media.toSummary
 import me.mjoacobf.openmusicstreaming.core.model.AppSettings
-import me.mjoacobf.openmusicstreaming.core.model.ItemType
-import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
 
 class PlayerViewModel(
     val connection: PlayerConnection,
     private val settingsRepository: SettingsRepository,
     private val bookmarks: BookmarkRepository,
+    private val userPlaylists: UserPlaylistRepository,
 ) : ViewModel() {
+
+    val playlists: StateFlow<List<me.mjoacobf.openmusicstreaming.core.model.UserPlaylist>> =
+        userPlaylists.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addToPlaylist(playlistId: Long, item: MediaItem) = viewModelScope.launch {
+        item.toSummary()?.let { userPlaylists.add(playlistId, listOf(it)) }
+    }
+
+    fun createPlaylistWith(name: String, item: MediaItem) = viewModelScope.launch {
+        item.toSummary()?.let { userPlaylists.add(userPlaylists.create(name), listOf(it)) }
+    }
+
 
     val state: StateFlow<PlayerState> = connection.state
     val position: StateFlow<Long> = connection.position
@@ -55,20 +67,5 @@ class PlayerViewModel(
     fun toggleBookmark(item: MediaItem) = viewModelScope.launch {
         val summary = item.toSummary() ?: return@launch
         bookmarks.toggle(summary, summary.url in bookmarkedUrls.value)
-    }
-
-    companion object {
-        fun MediaItem.toSummary(): MediaSummary? {
-            val url = mediaMetadata.extras?.getString(MediaIds.EXTRA_URL) ?: return null
-            return MediaSummary(
-                url = url,
-                id = MediaIds.videoId(mediaId),
-                type = if (MediaIds.isVideo(mediaId)) ItemType.VIDEO else ItemType.SONG,
-                title = mediaMetadata.title?.toString().orEmpty(),
-                subtitle = mediaMetadata.artist?.toString().orEmpty(),
-                thumbnailUrl = mediaMetadata.artworkUri?.toString(),
-                durationSec = mediaMetadata.extras?.getLong(MediaIds.EXTRA_DURATION) ?: -1,
-            )
-        }
     }
 }
