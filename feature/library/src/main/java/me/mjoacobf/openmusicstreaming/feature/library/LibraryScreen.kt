@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
@@ -43,8 +46,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +59,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,17 +91,65 @@ fun LibraryScreen(
     onOpenHistory: () -> Unit,
     onExplore: () -> Unit,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val full by viewModel.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    // Búsqueda local: filtra canciones, playlists descargadas y listas propias por texto
+    val state = remember(full, query) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            full
+        } else {
+            full.copy(
+                songs = full.songs.filter {
+                    it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true)
+                },
+                playlists = full.playlists.filter { it.title.contains(q, true) || it.uploader.contains(q, true) },
+                userPlaylists = full.userPlaylists.filter { it.name.contains(q, true) },
+            )
+        }
+    }
+    val filtering = query.isNotBlank()
+    LaunchedEffect(searching) { if (searching) focusRequester.requestFocus() }
     var toDelete by remember { mutableStateOf<LocalPlaylist?>(null) }
     var creating by remember { mutableStateOf(false) }
     var songForPlaylist by remember { mutableStateOf<Song?>(null) }
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Biblioteca") },
+                title = {
+                    if (searching) {
+                        TextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                            placeholder = { Text("Buscar en tu biblioteca") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                        )
+                    } else {
+                        Text("Biblioteca")
+                    }
+                },
                 actions = {
+                    IconButton(onClick = {
+                        if (searching) query = ""
+                        searching = !searching
+                    }) {
+                        Icon(
+                            if (searching) Icons.Rounded.Close else Icons.Rounded.Search,
+                            if (searching) "Cerrar búsqueda" else "Buscar en la biblioteca",
+                        )
+                    }
                     IconButton(onClick = onOpenHistory) { Icon(Icons.Rounded.History, "Historial") }
                     if (state.playlists.isNotEmpty()) {
                         IconButton(onClick = viewModel::syncAll) {
@@ -123,8 +182,19 @@ fun LibraryScreen(
                 Tab(tab == 2, { tab = 2 }, text = { Text("Mis listas (${state.userPlaylists.size})") })
             }
             ActiveDownloads(state.downloads.values.toList(), viewModel::dismissDownload, viewModel::cancelDownload)
+            val nothingFound = filtering && when (tab) {
+                0 -> state.playlists.isEmpty()
+                1 -> state.songs.isEmpty()
+                else -> state.userPlaylists.isEmpty()
+            }
             when {
                 state.loading -> LoadingBox()
+                nothingFound -> EmptyState(
+                    Icons.Rounded.Search,
+                    "Sin resultados",
+                    "Nada coincide con \"${query.trim()}\" en esta pestaña.",
+                )
+
                 tab == 2 && state.userPlaylists.isEmpty() -> EmptyState(
                     Icons.Rounded.PlaylistAdd,
                     "Crea tu primera playlist",

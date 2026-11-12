@@ -31,9 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.mjoacobf.openmusicstreaming.core.designsystem.SectionHeader
+import me.mjoacobf.openmusicstreaming.core.designsystem.clearImageCache
 import me.mjoacobf.openmusicstreaming.core.designsystem.readableFolder
 import me.mjoacobf.openmusicstreaming.core.designsystem.rememberFolderPicker
 import me.mjoacobf.openmusicstreaming.core.model.AudioQuality
@@ -48,7 +51,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val snackbar = remember { SnackbarHostState() }
     val update = viewModel::update
 
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val cacheSize by viewModel.cacheSize.collectAsStateWithLifecycle()
+    val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
+    var confirmClearData by remember { mutableStateOf(false) }
+    val clearImages = remember(context) { { clearImageCache(context.applicationContext) } }
+
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(viewModel) { viewModel.refreshCacheSize() }
 
     val pickFolder = rememberFolderPicker { uri -> update { it.copy(downloadTreeUri = uri.toString()) } }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
@@ -161,6 +172,24 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ) { v -> update { it.copy(savePlayHistory = v) } }
             ClickSetting("Borrar historial de reproducción", null, onClick = viewModel::clearPlayHistory)
 
+            SectionHeader("Almacenamiento")
+            ClickSetting(
+                "Limpiar caché",
+                "Carátulas, letras y archivos temporales (${formatBytes(cacheSize)}). Se vuelven a descargar al necesitarlos.",
+            ) { viewModel.clearCache(clearImages) }
+            ClickSetting(
+                "Borrar datos de la app",
+                "Restablece historiales, marcadores, playlists propias y ajustes. Tus archivos de audio no se borran.",
+            ) { confirmClearData = true }
+
+            SectionHeader("Actualizaciones")
+            SwitchSetting(
+                "Avisar de nuevas versiones",
+                "Al abrir la app comprueba si hay una versión nueva en GitHub (instalarla es opcional)",
+                s.checkForUpdates,
+            ) { v -> update { it.copy(checkForUpdates = v, dismissedUpdateVersion = "") } }
+            ClickSetting("Buscar actualizaciones", "Versión instalada: ${viewModel.installedVersion}", onClick = viewModel::checkUpdatesNow)
+
             SectionHeader("Copia de seguridad")
             ClickSetting("Exportar configuración", "Guarda los ajustes en un archivo JSON") {
                 exportLauncher.launch("openmusicstreaming-ajustes.json")
@@ -180,6 +209,44 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             )
         }
     }
+
+    if (confirmClearData) {
+        AlertDialog(
+            onDismissRequest = { confirmClearData = false },
+            title = { Text("¿Borrar los datos de la app?") },
+            text = {
+                Text(
+                    "Se borrarán el historial de reproducción y de búsqueda, los marcadores, tus playlists, " +
+                        "el registro de descargas, las descargas pendientes y todos los ajustes. " +
+                        "Los archivos de audio de tu carpeta no se tocan, pero la app dejará de listarlos. " +
+                        "Esta acción no se puede deshacer.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmClearData = false; viewModel.clearAllData(clearImages) }) { Text("Borrar todo") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClearData = false }) { Text("Cancelar") } },
+        )
+    }
+
+    availableUpdate?.let { release ->
+        AlertDialog(
+            onDismissRequest = viewModel::closeUpdateDialog,
+            title = { Text("Nueva versión disponible") },
+            text = { Text("Open Music Streaming ${release.version} está disponible (tienes ${viewModel.installedVersion}). Actualizar es opcional.") },
+            confirmButton = {
+                TextButton(onClick = { uriHandler.openUri(release.url); viewModel.closeUpdateDialog() }) { Text("Ver en GitHub") }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissUpdate) { Text("Ahora no") } },
+        )
+    }
+}
+
+/** Tamaño legible (KB / MB). */
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1L shl 20 -> "%.1f MB".format(bytes / (1L shl 20).toDouble())
+    bytes >= 1L shl 10 -> "${bytes shr 10} KB"
+    else -> "vacía"
 }
 
 @Composable
