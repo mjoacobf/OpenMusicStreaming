@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import me.mjoacobf.openmusicstreaming.core.extractor.potoken.PoTokenProviderImpl
 import me.mjoacobf.openmusicstreaming.core.model.ItemType
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
+import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.PageToken
 import me.mjoacobf.openmusicstreaming.core.model.PagedItems
 import me.mjoacobf.openmusicstreaming.core.model.RemoteCollection
@@ -13,12 +14,12 @@ import me.mjoacobf.openmusicstreaming.core.model.SearchFilter
 import me.mjoacobf.openmusicstreaming.core.model.StreamDetails
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
-import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.StreamingService.LinkType
 import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.search.SearchInfo
+import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory as Q
 import java.util.Locale
@@ -30,16 +31,15 @@ sealed interface LinkTarget {
 }
 
 /**
- * Fachada sobre NewPipeExtractor para YouTube / YouTube Music: búsqueda,
- * sugerencias, detalle con recomendados y playlists/álbumes paginados.
+ * Fachada sobre NewPipeExtractor para YouTube Music, SoundCloud y Bandcamp: búsqueda,
+ * sugerencias, detalle con recomendados y playlists/álbumes paginados. El servicio se deduce de
+ * la URL (o del parámetro `service` en búsquedas), igual que hace NewPipe.
  */
 class YoutubeService(
     private val context: Context,
     private val downloader: NewPipeDownloader,
     val resolver: StreamResolver,
 ) {
-    private val service get() = ServiceList.YouTube
-
     fun init(countryCode: String) {
         val locale = Locale.getDefault()
         val country = countryCode.ifBlank { locale.country.ifBlank { "US" } }
@@ -52,42 +52,57 @@ class YoutubeService(
         NewPipe.setPreferredContentCountry(ContentCountry(country))
     }
 
-    private fun SearchFilter.contentFilter(): String = when (this) {
-        SearchFilter.MUSIC_SONGS -> Q.MUSIC_SONGS
-        SearchFilter.MUSIC_VIDEOS -> Q.MUSIC_VIDEOS
-        SearchFilter.MUSIC_ALBUMS -> Q.MUSIC_ALBUMS
-        SearchFilter.MUSIC_PLAYLISTS -> Q.MUSIC_PLAYLISTS
-        SearchFilter.VIDEOS -> Q.VIDEOS
-        SearchFilter.PLAYLISTS -> Q.PLAYLISTS
-        SearchFilter.ALL -> Q.ALL
-    }
-
-    private fun queryHandler(query: String, filter: SearchFilter) =
-        service.searchQHFactory.fromQuery(query, listOf(filter.contentFilter()), "")
-
-    suspend fun search(query: String, filter: SearchFilter): PagedItems = withContext(Dispatchers.IO) {
-        val info = SearchInfo.getInfo(service, queryHandler(query, filter))
-        PagedItems(
-            info.relatedItems.mapNotNull { it.toSummary(filter) },
-            info.nextPage?.let(::PageToken),
+    /** Filtros de búsqueda del servicio (Bandcamp no tiene: mezcla pistas y álbumes). */
+    private fun contentFilters(service: MusicService, filter: SearchFilter): List<String> = when (service) {
+        MusicService.YOUTUBE -> listOf(
+            when (filter) {
+                SearchFilter.MUSIC_SONGS -> Q.MUSIC_SONGS
+                SearchFilter.MUSIC_VIDEOS -> Q.MUSIC_VIDEOS
+                SearchFilter.MUSIC_ALBUMS -> Q.MUSIC_ALBUMS
+                SearchFilter.MUSIC_PLAYLISTS -> Q.MUSIC_PLAYLISTS
+            },
         )
+
+        MusicService.SOUNDCLOUD -> listOf(
+            if (filter == SearchFilter.MUSIC_PLAYLISTS || filter == SearchFilter.MUSIC_ALBUMS) {
+                SoundcloudSearchQueryHandlerFactory.PLAYLISTS
+            } else {
+                SoundcloudSearchQueryHandlerFactory.TRACKS
+            },
+        )
+
+        MusicService.BANDCAMP -> emptyList()
     }
 
-    suspend fun searchMore(query: String, filter: SearchFilter, page: PageToken): PagedItems =
+    private fun queryHandler(query: String, service: MusicService, filter: SearchFilter) =
+        service.newPipe.searchQHFactory.fromQuery(query, contentFilters(service, filter), "")
+
+    suspend fun search(query: String, service: MusicService, filter: SearchFilter): PagedItems =
         withContext(Dispatchers.IO) {
-            val result = SearchInfo.getMoreItems(service, queryHandler(query, filter), page.value as Page)
+            val info = SearchInfo.getInfo(service.newPipe, queryHandler(query, service, filter))
+            PagedItems(
+                info.relatedItems.mapNotNull { it.toSummary(filter) },
+                info.nextPage?.let(::PageToken),
+            )
+        }
+
+    suspend fun searchMore(query: String, service: MusicService, filter: SearchFilter, page: PageToken): PagedItems =
+        withContext(Dispatchers.IO) {
+            val result = SearchInfo.getMoreItems(
+                service.newPipe, queryHandler(query, service, filter), page.value as Page,
+            )
             PagedItems(result.items.mapNotNull { it.toSummary(filter) }, result.nextPage?.let(::PageToken))
         }
 
-    suspend fun suggestions(query: String): List<String> = withContext(Dispatchers.IO) {
-        runCatching { service.suggestionExtractor.suggestionList(query) }.getOrDefault(emptyList())
+    suspend fun suggestions(query: String, service: MusicService): List<String> = withContext(Dispatchers.IO) {
+        runCatching { service.newPipe.suggestionExtractor.suggestionList(query) }.getOrDefault(emptyList())
     }
 
-    /** Detecta si el texto es un enlace de YouTube (incluido contenido oculto / no listado). */
+    /** Detecta si el texto es un enlace de YouTube, SoundCloud o Bandcamp (incluido contenido no listado). */
     fun parseLink(text: String): LinkTarget? {
         val url = text.trim()
         if (!url.startsWith("http://") && !url.startsWith("https://")) return null
-        return when (runCatching { service.getLinkTypeByUrl(url) }.getOrNull()) {
+        return when (runCatching { MusicService.ofUrl(url).newPipe.getLinkTypeByUrl(url) }.getOrNull()) {
             LinkType.STREAM -> LinkTarget.Stream(url)
             LinkType.PLAYLIST -> LinkTarget.Collection(url)
             else -> null
@@ -95,14 +110,14 @@ class YoutubeService(
     }
 
     suspend fun streamDetails(url: String): StreamDetails = withContext(Dispatchers.IO) {
-        val id = videoIdFromUrl(url) ?: error("URL de video no válida")
+        val id = itemId(url)
         val info = resolver.streamInfo(id)
         StreamDetails(
             id = id,
             url = info.url,
             title = cleanCollectionTitle(info.name),
             uploader = cleanArtist(info.uploaderName),
-            thumbnailUrl = info.thumbnails.pickUrl(720),
+            thumbnailUrl = info.thumbnails.pickUrl(DETAIL_THUMB),
             durationSec = info.duration,
             viewCount = info.viewCount,
             description = info.description?.let { d ->
@@ -112,7 +127,7 @@ class YoutubeService(
                     d.content
                 }
             }.orEmpty(),
-            related = info.relatedItems.mapNotNull { it.toSummary() },
+            related = info.relatedItems.mapNotNull { it.toSummary() }.musicOnly(),
         )
     }
 
@@ -121,10 +136,11 @@ class YoutubeService(
         resolver.streamInfo(videoId).relatedItems
             .mapNotNull { it.toSummary() }
             .filter { it.isPlayable }
+            .musicOnly()
     }
 
     suspend fun collection(url: String): RemoteCollection = withContext(Dispatchers.IO) {
-        val info = PlaylistInfo.getInfo(service, url)
+        val info = PlaylistInfo.getInfo(MusicService.ofUrl(url).newPipe, url)
         val album = isAlbumUrl(url) || isAlbumUrl(info.url)
         RemoteCollection(
             url = info.url,
@@ -132,7 +148,7 @@ class YoutubeService(
             type = if (album) ItemType.ALBUM else ItemType.PLAYLIST,
             title = cleanCollectionTitle(info.name),
             uploader = cleanArtist(info.uploaderName),
-            thumbnailUrl = info.thumbnails.pickUrl(480),
+            thumbnailUrl = info.thumbnails.pickUrl(DETAIL_THUMB),
             streamCount = info.streamCount,
             firstPage = PagedItems(
                 info.relatedItems.mapNotNull { it.toSummary(if (album) SearchFilter.MUSIC_SONGS else null) },
@@ -142,7 +158,7 @@ class YoutubeService(
     }
 
     suspend fun collectionMore(url: String, page: PageToken): PagedItems = withContext(Dispatchers.IO) {
-        val result = PlaylistInfo.getMoreItems(service, url, page.value as Page)
+        val result = PlaylistInfo.getMoreItems(MusicService.ofUrl(url).newPipe, url, page.value as Page)
         PagedItems(result.items.mapNotNull { it.toSummary() }, result.nextPage?.let(::PageToken))
     }
 
@@ -157,5 +173,10 @@ class YoutubeService(
             next = page.nextPage
         }
         return collection to items.distinctBy { it.id }
+    }
+
+    private companion object {
+        /** Ancho de las portadas en cabeceras de álbum/detalle (nítidas a pantalla completa). */
+        const val DETAIL_THUMB = 1080
     }
 }

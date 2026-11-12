@@ -14,6 +14,7 @@ import kotlin.math.min
 
 /**
  * DataSource para URIs `ytstream://...`:
+ *  0. Para SoundCloud y Bandcamp (sin bloques ni POST) solo resuelve la URL y la lee tal cual.
  *  1. Resuelve la URL real de googlevideo con [StreamResolver] (con caché).
  *  2. Pide el contenido en bloques usando el parámetro `range` y POST, igual que los
  *     clientes oficiales y que `YoutubeHttpDataSource` de NewPipe, evitando el
@@ -37,6 +38,7 @@ class YoutubeDataSource(
     private var requestNumber = 0
     private var refreshed = false
     private var opened = false
+    private var direct = false
 
     override fun open(dataSpec: DataSpec): Long {
         this.dataSpec = dataSpec
@@ -44,6 +46,13 @@ class YoutubeDataSource(
         transferInitializing(dataSpec)
         val target = resolver.resolve(dataSpec.uri, forceRefresh = false)
         resolved = target
+        direct = !target.chunked
+        if (direct) {
+            val length = openDirect(dataSpec, target)
+            opened = true
+            transferStarted(dataSpec)
+            return length
+        }
         position = dataSpec.position
         end = when {
             dataSpec.length != C.LENGTH_UNSET.toLong() -> position + dataSpec.length
@@ -54,6 +63,29 @@ class YoutubeDataSource(
         opened = true
         transferStarted(dataSpec)
         return if (end > 0) end - position else C.LENGTH_UNSET.toLong()
+    }
+
+    /** SoundCloud / Bandcamp: petición HTTP normal (con `Range` si hay posición), sin bloques ni POST. */
+    private fun openDirect(spec: DataSpec, target: ResolvedStream): Long {
+        val source = upstreamFactory.createDataSource()
+        val request = spec.buildUpon()
+            .setUri(Uri.parse(target.url))
+            .setHttpRequestHeaders(mapOf("User-Agent" to NewPipeDownloader.USER_AGENT))
+            .build()
+        return try {
+            val length = source.open(request)
+            upstream = source
+            length
+        } catch (e: HttpDataSource.InvalidResponseCodeException) {
+            runCatching { source.close() }
+            if (!refreshed && (e.responseCode == 403 || e.responseCode == 410)) {
+                refreshed = true
+                resolved = resolver.resolve(spec.uri, forceRefresh = true)
+                openDirect(spec, resolved!!)
+            } else {
+                throw e
+            }
+        }
     }
 
     private fun openChunk() {
@@ -91,6 +123,11 @@ class YoutubeDataSource(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         if (length == 0) return 0
+        if (direct) {
+            val read = upstream?.read(buffer, offset, length) ?: return C.RESULT_END_OF_INPUT
+            if (read != C.RESULT_END_OF_INPUT) bytesTransferred(read)
+            return read
+        }
         if (end > 0 && position >= end) return C.RESULT_END_OF_INPUT
         var source = upstream ?: return C.RESULT_END_OF_INPUT
         val toRead = if (end > 0) min(length.toLong(), end - position).toInt() else length
