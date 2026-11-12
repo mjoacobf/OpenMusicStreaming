@@ -8,6 +8,7 @@ import me.mjoacobf.openmusicstreaming.core.database.SearchHistoryEntity
 import me.mjoacobf.openmusicstreaming.core.extractor.LinkTarget
 import me.mjoacobf.openmusicstreaming.core.extractor.YoutubeService
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
+import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.PageToken
 import me.mjoacobf.openmusicstreaming.core.model.PagedItems
 import me.mjoacobf.openmusicstreaming.core.model.RemoteCollection
@@ -26,12 +27,14 @@ class StreamingRepository(
 ) {
     private val historyDao = db.searchHistoryDao()
 
-    suspend fun search(query: String, filter: SearchFilter): PagedItems = youtube.search(query, filter)
+    suspend fun search(query: String, service: MusicService, filter: SearchFilter): PagedItems =
+        youtube.search(query, service, filter)
 
-    suspend fun searchMore(query: String, filter: SearchFilter, page: PageToken): PagedItems =
-        youtube.searchMore(query, filter, page)
+    suspend fun searchMore(query: String, service: MusicService, filter: SearchFilter, page: PageToken): PagedItems =
+        youtube.searchMore(query, service, filter, page)
 
-    suspend fun suggestions(query: String): List<String> = youtube.suggestions(query)
+    suspend fun suggestions(query: String, service: MusicService): List<String> =
+        youtube.suggestions(query, service)
 
     fun parseLink(text: String): ParsedLink? = when (val t = youtube.parseLink(text)) {
         is LinkTarget.Stream -> ParsedLink.Stream(t.url)
