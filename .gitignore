@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+build/
+.kotlin/
+
+# Firma de release (nunca subir al repositorio)
+*.jks
+*.keystore
+keystore.properties
+dist/
