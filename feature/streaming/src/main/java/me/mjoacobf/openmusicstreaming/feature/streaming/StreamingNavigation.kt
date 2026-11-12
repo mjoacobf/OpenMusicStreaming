@@ -14,7 +14,7 @@ import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
 val streamingModule = module {
-    factory { RemoteActions(get(), get(), get(), get()) }
+    factory { RemoteActions(get(), get(), get(), get(), get()) }
     viewModel { SearchViewModel(get(), get(), get()) }
     viewModel { params -> StreamDetailViewModel(params.get(), get(), get(), get()) }
     viewModel { params -> CollectionViewModel(params.get(), get(), get(), get()) }

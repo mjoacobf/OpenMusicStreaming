@@ -26,11 +26,13 @@ import me.mjoacobf.openmusicstreaming.core.data.ParsedLink
 import me.mjoacobf.openmusicstreaming.core.data.StreamingRepository
 import me.mjoacobf.openmusicstreaming.core.model.AppSettings
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
+import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.PageToken
 import me.mjoacobf.openmusicstreaming.core.model.SearchFilter
 
 data class SearchUiState(
     val submittedQuery: String = "",
+    val service: MusicService = MusicService.YOUTUBE,
     val filter: SearchFilter = SearchFilter.MUSIC_SONGS,
     val results: List<MediaSummary> = emptyList(),
     val nextPage: PageToken? = null,
@@ -70,19 +72,21 @@ class SearchViewModel(
         library.observeDownloadedIds().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /** Sugerencias de YouTube + historial local mientras se escribe. */
-    val suggestions: StateFlow<List<String>> = combine(_query, settings) { q, s -> q to s.saveSearchHistory }
+    val suggestions: StateFlow<List<String>> = combine(_query, settings, _state) { q, s, st ->
+        Triple(q, s.saveSearchHistory, st.service)
+    }
         .debounce(250)
         .distinctUntilChanged()
-        .flatMapLatest { (q, historyEnabled) ->
+        .flatMapLatest { (q, historyEnabled, service) ->
             repository.history(q.trim(), historyEnabled).map { history ->
-                history to q
+                Triple(history, q, service)
             }
         }
-        .flatMapLatest { (history, q) ->
+        .flatMapLatest { (history, q, service) ->
             flow {
                 emit(history)
                 if (q.isNotBlank() && repository.parseLink(q) == null) {
-                    val remote = repository.suggestions(q)
+                    val remote = repository.suggestions(q, service)
                     emit((history + remote).distinct().take(12))
                 }
             }
@@ -93,6 +97,13 @@ class SearchViewModel(
 
     fun onQueryChange(value: String) {
         _query.value = value
+    }
+
+    /** Cambia de servicio (YouTube Music, SoundCloud, Bandcamp) y repite la búsqueda actual. */
+    fun setService(service: MusicService) {
+        if (service == _state.value.service) return
+        _state.update { it.copy(service = service, filter = SearchFilter.MUSIC_SONGS) }
+        if (_state.value.submittedQuery.isNotBlank()) search(_state.value.submittedQuery)
     }
 
     fun setFilter(filter: SearchFilter) {
@@ -120,7 +131,7 @@ class SearchViewModel(
         searchJob = viewModelScope.launch {
             if (settings.value.saveSearchHistory) runCatching { repository.saveHistory(q) }
             try {
-                val page = repository.search(q, _state.value.filter)
+                val page = repository.search(q, _state.value.service, _state.value.filter)
                 _state.update { it.copy(loading = false, results = page.items, nextPage = page.nextPage) }
             } catch (e: CancellationException) {
                 throw e
@@ -137,7 +148,7 @@ class SearchViewModel(
         _state.update { it.copy(loadingMore = true) }
         viewModelScope.launch {
             try {
-                val more = repository.searchMore(s.submittedQuery, s.filter, page)
+                val more = repository.searchMore(s.submittedQuery, s.service, s.filter, page)
                 _state.update {
                     it.copy(
                         loadingMore = false,
@@ -160,6 +171,6 @@ internal fun Throwable.userMessage(): String = when {
     this is java.net.UnknownHostException || this is java.net.SocketTimeoutException ->
         "Sin conexión a internet"
     this::class.simpleName == "ContentNotAvailableException" -> "Contenido no disponible"
-    this::class.simpleName == "ReCaptchaException" -> "YouTube solicitó un captcha. Intenta más tarde."
+    this::class.simpleName == "ReCaptchaException" -> "El servicio solicitó un captcha. Intenta más tarde."
     else -> message ?: "Error desconocido"
 }

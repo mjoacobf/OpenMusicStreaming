@@ -48,17 +48,16 @@ import me.mjoacobf.openmusicstreaming.core.designsystem.EmptyState
 import me.mjoacobf.openmusicstreaming.core.designsystem.ErrorBox
 import me.mjoacobf.openmusicstreaming.core.designsystem.LoadingBox
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
+import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.SearchFilter
 
-private val filterLabels = listOf(
-    SearchFilter.MUSIC_SONGS to "Canciones",
-    SearchFilter.MUSIC_VIDEOS to "Videos musicales",
-    SearchFilter.MUSIC_ALBUMS to "Álbumes",
-    SearchFilter.MUSIC_PLAYLISTS to "Playlists",
-    SearchFilter.VIDEOS to "Videos de YouTube",
-    SearchFilter.PLAYLISTS to "Playlists de YouTube",
-    SearchFilter.ALL to "Todo",
-)
+/** Solo contenido musical: no se ofrece buscar cualquier video de YouTube. */
+private fun SearchFilter.label() = when (this) {
+    SearchFilter.MUSIC_SONGS -> "Canciones"
+    SearchFilter.MUSIC_VIDEOS -> "Videos musicales"
+    SearchFilter.MUSIC_ALBUMS -> "Álbumes"
+    SearchFilter.MUSIC_PLAYLISTS -> "Playlists"
+}
 
 @Composable
 fun SearchScreen(
@@ -76,6 +75,7 @@ fun SearchScreen(
     var focused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     var downloadTarget by remember { mutableStateOf<MediaSummary?>(null) }
+    var playlistTarget by remember { mutableStateOf<MediaSummary?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
@@ -96,6 +96,7 @@ fun SearchScreen(
             onAddToQueue = viewModel.actions::addToQueue,
             onDownload = { downloadTarget = it },
             onToggleBookmark = { item, b -> viewModel.actions.toggleBookmark(scope, item, b) },
+            onAddToPlaylist = { playlistTarget = it },
         )
     }
 
@@ -108,7 +109,7 @@ fun SearchScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .onFocusChanged { focused = it.isFocused },
-                placeholder = { Text("Buscar o pegar un enlace de YouTube") },
+                placeholder = { Text("Buscar o pegar un enlace") },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
@@ -124,13 +125,25 @@ fun SearchScreen(
                 }),
             )
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
-                items(filterLabels, key = { it.first.name }, contentType = { "chip" }) { (filter, label) ->
+                items(MusicService.entries, key = { it.name }, contentType = { "service" }) { service ->
                     FilterChip(
-                        selected = state.filter == filter,
-                        onClick = { viewModel.setFilter(filter) },
-                        label = { Text(label) },
+                        selected = state.service == service,
+                        onClick = { viewModel.setService(service) },
+                        label = { Text(service.label) },
                         modifier = Modifier.padding(end = 8.dp),
                     )
+                }
+            }
+            if (state.service.filters.isNotEmpty()) {
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
+                    items(state.service.filters, key = { it.name }, contentType = { "chip" }) { filter ->
+                        FilterChip(
+                            selected = state.filter == filter,
+                            onClick = { viewModel.setFilter(filter) },
+                            label = { Text(filter.label()) },
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 }
             }
             Box(Modifier.fillMaxSize()) {
@@ -139,8 +152,8 @@ fun SearchScreen(
                     state.error != null -> ErrorBox(state.error!!, onRetry = { viewModel.search(state.submittedQuery) })
                     state.results.isEmpty() && state.submittedQuery.isEmpty() -> EmptyState(
                         Icons.Rounded.TravelExplore,
-                        "Explora YouTube Music",
-                        "Busca canciones, álbumes, playlists o videos. También puedes pegar un enlace, incluso de contenido no listado.",
+                        "Explora música",
+                        "Busca canciones, álbumes y playlists en YouTube Music, SoundCloud o Bandcamp. También puedes pegar un enlace, incluso de contenido no listado.",
                     )
                     state.results.isEmpty() -> EmptyState(Icons.Rounded.Search, "Sin resultados", "Prueba con otro término o filtro.")
                     else -> ResultList(state, bookmarked, downloaded, callbacks, viewModel::loadMore)
@@ -169,6 +182,8 @@ fun SearchScreen(
             }
         }
     }
+
+    AddToPlaylistHost(viewModel.actions, playlistTarget) { playlistTarget = null }
 
     downloadTarget?.let { item ->
         DownloadDialog(

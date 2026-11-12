@@ -66,6 +66,7 @@ fun StreamDetailScreen(
     val downloaded by viewModel.downloadedIds.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var downloadTarget by remember { mutableStateOf<MediaSummary?>(null) }
+    var playlistTarget by remember { mutableStateOf<MediaSummary?>(null) }
     val scope = rememberCoroutineScope()
     val actions = viewModel.actions
 
@@ -78,6 +79,7 @@ fun StreamDetailScreen(
             onAddToQueue = actions::addToQueue,
             onDownload = { downloadTarget = it },
             onToggleBookmark = { item, b -> actions.toggleBookmark(scope, item, b) },
+            onAddToPlaylist = { playlistTarget = it },
         )
     }
 
@@ -165,6 +167,8 @@ fun StreamDetailScreen(
             }
         }
     }
+
+    AddToPlaylistHost(actions, playlistTarget) { playlistTarget = null }
 
     downloadTarget?.let { item ->
         DownloadDialog(

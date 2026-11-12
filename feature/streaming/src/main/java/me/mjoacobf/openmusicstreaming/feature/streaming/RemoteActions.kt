@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.BookmarkRepository
 import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
+import me.mjoacobf.openmusicstreaming.core.data.UserPlaylistRepository
 import me.mjoacobf.openmusicstreaming.core.download.DownloadManager
 import me.mjoacobf.openmusicstreaming.core.media.PlayerConnection
 import me.mjoacobf.openmusicstreaming.core.media.toMediaItem
@@ -15,9 +16,19 @@ class RemoteActions(
     private val bookmarks: BookmarkRepository,
     private val downloads: DownloadManager,
     private val settings: SettingsRepository,
+    private val userPlaylists: UserPlaylistRepository,
 ) {
     val bookmarkedUrls = bookmarks.observeUrls()
     val settingsFlow = settings.settings
+    val playlistsFlow = userPlaylists.observeAll()
+
+    fun addToPlaylist(scope: CoroutineScope, playlistId: Long, item: MediaSummary) = scope.launch {
+        userPlaylists.add(playlistId, listOf(item))
+    }
+
+    fun createPlaylistWith(scope: CoroutineScope, name: String, item: MediaSummary) = scope.launch {
+        userPlaylists.add(userPlaylists.create(name), listOf(item))
+    }
 
     fun play(item: MediaSummary, asVideo: Boolean = false) = player.playRemote(listOf(item), 0, asVideo)
 
