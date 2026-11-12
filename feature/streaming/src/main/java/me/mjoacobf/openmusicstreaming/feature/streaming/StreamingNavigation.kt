@@ -2,6 +2,7 @@ package me.mjoacobf.openmusicstreaming.feature.streaming
 
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import me.mjoacobf.openmusicstreaming.core.navigation.ArtistRoute
 import me.mjoacobf.openmusicstreaming.core.navigation.LocalPlaylistRoute
 import me.mjoacobf.openmusicstreaming.core.navigation.Navigator
 import me.mjoacobf.openmusicstreaming.core.navigation.NowPlayingRoute
@@ -18,6 +19,7 @@ val streamingModule = module {
     viewModel { SearchViewModel(get(), get(), get()) }
     viewModel { params -> StreamDetailViewModel(params.get(), get(), get(), get()) }
     viewModel { params -> CollectionViewModel(params.get(), get(), get(), get()) }
+    viewModel { params -> ArtistViewModel(params.get(), get(), get(), get()) }
 }
 
 fun EntryProviderScope<NavKey>.streamingEntries(navigator: Navigator) {
@@ -26,12 +28,23 @@ fun EntryProviderScope<NavKey>.streamingEntries(navigator: Navigator) {
             viewModel = koinViewModel(),
             onOpenStream = { navigator.navigate(StreamDetailRoute(it)) },
             onOpenCollection = { navigator.navigate(RemoteCollectionRoute(it)) },
+            onOpenArtist = { navigator.navigate(ArtistRoute(it)) },
             onOpenPlayer = { navigator.navigate(NowPlayingRoute) },
         )
     }
     entry<StreamDetailRoute> { key ->
         StreamDetailScreen(
             viewModel = koinViewModel(key = "detail-${key.url}") { parametersOf(key.url) },
+            onBack = navigator::back,
+            onOpenStream = { navigator.navigate(StreamDetailRoute(it)) },
+            onOpenCollection = { navigator.navigate(RemoteCollectionRoute(it)) },
+            onOpenArtist = { navigator.navigate(ArtistRoute(it)) },
+            onOpenPlayer = { navigator.navigate(NowPlayingRoute) },
+        )
+    }
+    entry<ArtistRoute> { key ->
+        ArtistScreen(
+            viewModel = koinViewModel(key = "artist-${key.url}") { parametersOf(key.url) },
             onBack = navigator::back,
             onOpenStream = { navigator.navigate(StreamDetailRoute(it)) },
             onOpenCollection = { navigator.navigate(RemoteCollectionRoute(it)) },
@@ -43,6 +56,7 @@ fun EntryProviderScope<NavKey>.streamingEntries(navigator: Navigator) {
             viewModel = koinViewModel(key = "collection-${key.url}") { parametersOf(key.url) },
             onBack = navigator::back,
             onOpenStream = { navigator.navigate(StreamDetailRoute(it)) },
+            onOpenArtist = { navigator.navigate(ArtistRoute(it)) },
             onOpenLocalPlaylist = { navigator.navigate(LocalPlaylistRoute(it)) },
             onOpenPlayer = { navigator.navigate(NowPlayingRoute) },
         )

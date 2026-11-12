@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.OndemandVideo
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -59,6 +60,7 @@ fun StreamDetailScreen(
     onBack: () -> Unit,
     onOpenStream: (String) -> Unit,
     onOpenCollection: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
     onOpenPlayer: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -80,6 +82,7 @@ fun StreamDetailScreen(
             onDownload = { downloadTarget = it },
             onToggleBookmark = { item, b -> actions.toggleBookmark(scope, item, b) },
             onAddToPlaylist = { playlistTarget = it },
+            onOpenArtist = onOpenArtist,
         )
     }
 
@@ -119,6 +122,11 @@ fun StreamDetailScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            details.uploaderUrl?.let { artistUrl ->
+                                androidx.compose.material3.TextButton(onClick = { onOpenArtist(artistUrl) }) {
+                                    Icon(Icons.Rounded.Person, null); Text(" Ver artista")
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
                             Row(
                                 Modifier.horizontalScroll(rememberScrollState()),
