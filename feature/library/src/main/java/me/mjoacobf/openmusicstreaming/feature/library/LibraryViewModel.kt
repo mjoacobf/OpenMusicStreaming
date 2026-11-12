@@ -2,13 +2,21 @@ package me.mjoacobf.openmusicstreaming.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.LibraryRepository
+import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
 import me.mjoacobf.openmusicstreaming.core.data.UserPlaylistRepository
+import me.mjoacobf.openmusicstreaming.core.download.LibraryScanner
+import me.mjoacobf.openmusicstreaming.core.download.ScanResult
 import me.mjoacobf.openmusicstreaming.core.download.DownloadManager
 import me.mjoacobf.openmusicstreaming.core.media.PlayerConnection
 import me.mjoacobf.openmusicstreaming.core.media.toMediaItem
@@ -32,7 +40,60 @@ class LibraryViewModel(
     private val downloads: DownloadManager,
     private val player: PlayerConnection,
     private val userPlaylists: UserPlaylistRepository,
+    private val scanner: LibraryScanner,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
+
+    /** Estado del diálogo «Analizar carpeta de descargas». */
+    data class ScanUiState(
+        val visible: Boolean = false,
+        val treeUri: String? = null,
+        val running: Boolean = false,
+        val done: Int = 0,
+        val total: Int = 0,
+        val result: ScanResult? = null,
+        val error: String? = null,
+    )
+
+    private val _scan = MutableStateFlow(ScanUiState())
+    val scan: StateFlow<ScanUiState> = _scan.asStateFlow()
+    private var scanJob: Job? = null
+
+    fun openScan() {
+        viewModelScope.launch {
+            _scan.value = ScanUiState(visible = true, treeUri = settings.current().downloadTreeUri)
+        }
+    }
+
+    fun closeScan() {
+        scanJob?.cancel()
+        _scan.value = ScanUiState()
+    }
+
+    /** Carpeta elegida en el selector del sistema (se conserva como carpeta de descargas). */
+    fun setScanFolder(uri: String) {
+        viewModelScope.launch { settings.update { it.copy(downloadTreeUri = uri) } }
+        _scan.update { it.copy(treeUri = uri, result = null, error = null) }
+    }
+
+    fun startScan() {
+        val tree = _scan.value.treeUri
+        if (tree == null || !downloads.hasFolderPermission(tree)) {
+            _scan.update { it.copy(error = "Elige la carpeta de descargas para poder leerla.") }
+            return
+        }
+        _scan.update { it.copy(running = true, done = 0, total = 0, result = null, error = null) }
+        scanJob = viewModelScope.launch {
+            try {
+                val result = scanner.scan(tree) { done, total -> _scan.update { it.copy(done = done, total = total) } }
+                _scan.update { it.copy(running = false, result = result) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _scan.update { it.copy(running = false, error = e.message ?: "No se pudo analizar la carpeta") }
+            }
+        }
+    }
 
     val state: StateFlow<LibraryUiState> = combine(
         library.observePlaylists(),
