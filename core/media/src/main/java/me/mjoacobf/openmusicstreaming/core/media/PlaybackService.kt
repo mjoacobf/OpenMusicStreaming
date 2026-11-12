@@ -9,6 +9,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -31,8 +32,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.withContext
+import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.LibraryRepository
+import me.mjoacobf.openmusicstreaming.core.data.PlayHistoryRepository
 import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
 import me.mjoacobf.openmusicstreaming.core.data.StreamingRepository
 import me.mjoacobf.openmusicstreaming.core.extractor.StreamResolver
@@ -49,13 +53,15 @@ import org.koin.android.ext.android.inject
  *  - archivos locales y streaming de YouTube (audio o video);
  *  - aleatorio / repetir todo / repetir una (persistidos en ajustes);
  *  - reproducción automática de recomendados al terminar la cola;
- *  - pausa al conectar o desconectar audífonos/Bluetooth.
+ *  - pausa al conectar o desconectar audífonos/Bluetooth;
+ *  - historial de reproducción (si el usuario lo tiene activado).
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private val settingsRepository: SettingsRepository by inject()
     private val libraryRepository: LibraryRepository by inject()
+    private val historyRepository: PlayHistoryRepository by inject()
     private val streamingRepository: StreamingRepository by inject()
     private val resolver: StreamResolver by inject()
     private val okHttpClient: OkHttpClient by inject()
@@ -68,6 +74,7 @@ class PlaybackService : MediaSessionService() {
     @Volatile
     private var settings = AppSettings()
     private var autoplayJob: kotlinx.coroutines.Job? = null
+    private var lastHistoryKey: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -129,8 +136,15 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    /**
+     * La reproducción sigue con la app en "Recientes", pero al quitarla de ahí se pausa, se
+     * cierra la sesión y se detiene el servicio. Las descargas (WorkManager) siguen aparte.
+     */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!player.playWhenReady || player.mediaItemCount == 0) stopSelf()
+        player.stop()
+        player.clearMediaItems()
+        pauseAllPlayersAndStopSelf()
+        onAppClosed?.invoke()
     }
 
     override fun onDestroy() {
@@ -169,8 +183,11 @@ class PlaybackService : MediaSessionService() {
 
                 item.mediaId.startsWith(MediaIds.STREAM) -> {
                     val local = libraryRepository.getSong(id)?.localUri
-                    val uri = local?.let(Uri::parse) ?: StreamResolver.audioUri(id, quality)
-                    item.buildUpon().setUri(uri).build()
+                    if (local != null) {
+                        item.buildUpon().setUri(Uri.parse(local)).build()
+                    } else {
+                        streamItem(item, id, quality)
+                    }
                 }
 
                 item.mediaId.startsWith(MediaIds.VIDEO) -> {
@@ -183,6 +200,23 @@ class PlaybackService : MediaSessionService() {
                 else -> item
             }
         }.toMutableList()
+    }
+
+    /**
+     * Audio por streaming. YouTube y los servicios con archivo progresivo usan `ytstream://`;
+     * si el servicio solo ofrece HLS (SoundCloud), se usa la lista .m3u8 con el módulo HLS.
+     */
+    private suspend fun streamItem(item: MediaItem, id: String, quality: AudioQuality): MediaItem {
+        if (MusicService.ofId(id) != MusicService.YOUTUBE) {
+            val hlsUrl = withContext(Dispatchers.IO) {
+                val info = resolver.streamInfo(id)
+                if (StreamResolver.hasProgressiveAudio(info)) null else StreamResolver.selectHls(info, quality)?.content
+            }
+            if (hlsUrl != null) {
+                return item.buildUpon().setUri(hlsUrl).setMimeType(MimeTypes.APPLICATION_M3U8).build()
+            }
+        }
+        return item.buildUpon().setUri(StreamResolver.audioUri(id, quality)).build()
     }
 
     private data class VideoTag(val audioUri: Uri)
@@ -236,7 +270,13 @@ class PlaybackService : MediaSessionService() {
 
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            lastHistoryKey = null
+            if (player.playWhenReady) recordHistory()
             maybeQueueRelated()
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) recordHistory()
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -251,7 +291,18 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) maybeQueueRelated()
+            if (playbackState == Player.STATE_IDLE || playbackState == Player.STATE_ENDED) lastHistoryKey = null
         }
+    }
+
+    /** Anota la pista actual en el historial (una vez por reproducción, no al reanudar tras una pausa). */
+    private fun recordHistory() {
+        if (!settings.savePlayHistory) return
+        val item = player.currentMediaItem ?: return
+        if (item.mediaId == lastHistoryKey) return
+        lastHistoryKey = item.mediaId
+        val summary = item.toSummary() ?: return
+        scope.launch { runCatching { historyRepository.record(summary) } }
     }
 
     // region Botones personalizados (aleatorio / repetir) en la notificación
@@ -325,6 +376,10 @@ class PlaybackService : MediaSessionService() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "oms.open_player"
+
+        /** La app la usa para cerrar el proceso al quitar la tarea de Recientes si no hay descargas en curso. */
+        @Volatile
+        var onAppClosed: (() -> Unit)? = null
         private const val CMD_SHUFFLE = "oms.shuffle"
         private const val CMD_REPEAT = "oms.repeat"
 

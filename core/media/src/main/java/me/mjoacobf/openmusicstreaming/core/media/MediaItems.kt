@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import me.mjoacobf.openmusicstreaming.core.model.ItemType
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
 import me.mjoacobf.openmusicstreaming.core.model.Song
 
@@ -62,3 +63,17 @@ fun MediaSummary.toMediaItem(asVideo: Boolean = false): MediaItem = MediaItem.Bu
     .build()
 
 val MediaItem.videoId: String get() = MediaIds.videoId(mediaId)
+
+/** Datos del elemento de la cola como [MediaSummary] (marcadores, playlists, historial). */
+fun MediaItem.toSummary(): MediaSummary? {
+    val url = mediaMetadata.extras?.getString(MediaIds.EXTRA_URL) ?: return null
+    return MediaSummary(
+        url = url,
+        id = MediaIds.videoId(mediaId),
+        type = if (MediaIds.isVideo(mediaId)) ItemType.VIDEO else ItemType.SONG,
+        title = mediaMetadata.title?.toString().orEmpty(),
+        subtitle = mediaMetadata.artist?.toString().orEmpty(),
+        thumbnailUrl = mediaMetadata.artworkUri?.toString(),
+        durationSec = mediaMetadata.extras?.getLong(MediaIds.EXTRA_DURATION) ?: -1,
+    )
+}
