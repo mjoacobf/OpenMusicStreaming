@@ -1,0 +1,29 @@
+# Archivos que no deben entrar al grafo de conocimiento (sintaxis de .gitignore).
+# Solo se indexa código propio; esto reduce ruido y tokens.
+
+# Skills y configuración de agentes (documentación y scripts de terceros)
+.claude/
+.agents/
+skills-lock.json
+
+# Salidas de compilación y distribución
+build/
+dist/
+.gradle/
+.kotlin/
+.idea/
+
+# Recursos binarios y de marca
+branding/
+**/res/mipmap-*/
+**/res/drawable/
+**/schemas/
+
+# Licencia y secretos de firma
+LICENSE
+*.jks
+keystore.properties
+
+# Código de terceros copiado de NewPipe: se documenta en docs/REFERENCES.md,
+# pero sus 4 clases de muxer (>3000 líneas) dominarían el grafo
+core/download/src/main/java/**/mux/*.java
