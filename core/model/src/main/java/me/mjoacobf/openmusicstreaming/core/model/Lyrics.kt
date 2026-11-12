@@ -58,10 +58,24 @@ data class Lyrics(val lines: List<LyricLine>, val synced: Boolean) {
 /** Versión publicada más reciente (GitHub) para el aviso de actualización. */
 data class AppRelease(val version: String, val url: String)
 
-/** Compara versiones tipo `1.02` / `v1.2.3` numéricamente por segmentos. */
+/**
+ * Compara versiones. Las del proyecto son decimales de dos segmentos (`1.01`, `1.02`, `1.021`): el
+ * segundo se compara como fracción (`1.021` es posterior a `1.02` y anterior a `1.03`). Con tres o
+ * más segmentos (`1.2.3`) se compara numéricamente por segmentos.
+ */
 fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun parts(v: String) = v.trim().removePrefix("v").removePrefix("V")
-        .split('.', '-').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+    fun clean(v: String) = v.trim().removePrefix("v").removePrefix("V")
+    fun parts(v: String) = clean(v).split('.', '-').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+    val c = clean(candidate).split('.')
+    val k = clean(current).split('.')
+    if (c.size <= 2 && k.size <= 2) {
+        val major = (c[0].toIntOrNull() ?: 0).compareTo(k[0].toIntOrNull() ?: 0)
+        if (major != 0) return major > 0
+        val ca = c.getOrElse(1) { "0" }.takeWhile(Char::isDigit)
+        val ka = k.getOrElse(1) { "0" }.takeWhile(Char::isDigit)
+        val width = maxOf(ca.length, ka.length)
+        return ca.padEnd(width, '0') > ka.padEnd(width, '0')
+    }
     val a = parts(candidate)
     val b = parts(current)
     for (i in 0 until maxOf(a.size, b.size)) {

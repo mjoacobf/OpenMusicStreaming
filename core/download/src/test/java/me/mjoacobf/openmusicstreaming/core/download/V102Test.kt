@@ -47,6 +47,12 @@ class V102Test {
     fun `se compara la version publicada con la instalada`() {
         assertTrue(isNewerVersion("v1.02", "1.01"))
         assertTrue(isNewerVersion("1.10", "1.02"))
+        assertTrue(isNewerVersion("1.021", "1.02"))
+        assertTrue(isNewerVersion("1.03", "1.021"))
+        assertFalse(isNewerVersion("1.021", "1.03"))
+        assertFalse(isNewerVersion("1.02", "1.021"))
+        assertFalse(isNewerVersion("v1.021", "1.021"))
+        assertTrue(isNewerVersion("1.2.3", "1.2.2"))
         assertTrue(isNewerVersion("2.0", "1.99"))
         assertFalse(isNewerVersion("v1.02", "1.02"))
         assertFalse(isNewerVersion("1.01", "1.02"))
