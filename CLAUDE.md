@@ -105,3 +105,6 @@ app ─► feature:{library,streaming,player,bookmarks,settings} ─► core:{da
 `jetpack-compose-performance` (revisar UI/recomposición) · `navigation-3` (rutas, escenas, resultados) · `edge-to-edge` (insets) ·
 `r8-analyzer` (reglas keep) · `agp-9-upgrade` (build/AGP) · `android-clean-architecture` (capas) · `android-cli` (SDK/emulador/docs oficiales).
 Buscar más con skill-finder: `npx skills find <tema>`; solo fuentes con >1 K instalaciones o repos oficiales.
+
+**Clave nueva (v1.02):** la clave original se perdió y se generó otra (`oms`, RSA 4096, PKCS12). Las instalaciones firmadas con la clave anterior (v1.0/v1.01)
+**no se pueden actualizar** sobre la v1.02 (Android exige la misma firma): hay que desinstalar e instalar de nuevo. Desde la v1.02 en adelante, **respaldar `release.jks` y `keystore.properties`**.
