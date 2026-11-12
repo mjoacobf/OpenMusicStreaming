@@ -13,7 +13,7 @@ import kotlin.math.min
 /**
  * Genera la carátula embebida: recorta la miniatura al centro en formato cuadrado
  * (en los videos "Topic" de YouTube Music coincide con la portada del álbum),
- * la reduce a 360 px y la codifica como bloque FLAC `METADATA_BLOCK_PICTURE`.
+ * la reduce (hasta 600 px) y la codifica como bloque FLAC `METADATA_BLOCK_PICTURE`.
  */
 internal class CoverArt(private val client: OkHttpClient) {
 
@@ -49,6 +49,23 @@ internal class CoverArt(private val client: OkHttpClient) {
         bitmap.recycle()
         out.toByteArray()
     }.getOrNull()
+
+    /**
+     * JPEG cuadrado que no supera [maxBytes]: baja la calidad y, si hace falta, el tamaño.
+     * Sirve para la carátula incrustada (la página Ogg de OpusTags admite < 65 025 bytes
+     * y el base64 aumenta un tercio el peso).
+     */
+    fun squareJpegFitting(source: ByteArray, size: Int, maxBytes: Int): ByteArray? {
+        var side = size
+        while (side >= 256) {
+            for (quality in intArrayOf(85, 75, 65)) {
+                val jpeg = squareJpeg(source, side, quality) ?: return null
+                if (jpeg.size <= maxBytes) return jpeg
+            }
+            side = side * 3 / 4
+        }
+        return squareJpeg(source, 256, 55)
+    }
 
     /** Valor de la etiqueta Vorbis `METADATA_BLOCK_PICTURE` (base64). */
     fun pictureBlockBase64(jpeg: ByteArray, size: Int): String {

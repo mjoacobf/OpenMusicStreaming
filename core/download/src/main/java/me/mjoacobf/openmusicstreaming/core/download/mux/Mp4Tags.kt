@@ -28,7 +28,7 @@ object Mp4Tags {
         m.albumArtist?.takeIf { it.isNotBlank() }?.let { textItem(items, "aART", it) }
         m.year?.let { textItem(items, "©day", it.toString()) }
         m.comment?.takeIf { it.isNotBlank() }?.let { textItem(items, "©cmt", it) }
-        textItem(items, "©too", "OpenMusicStreaming")
+        textItem(items, "©too", "Open Music Streaming")
         m.trackNumber?.let { track ->
             val payload = byteArrayOf(0, 0, (track shr 8).toByte(), track.toByte(), 0, 0, 0, 0)
             items.write(item("trkn", data(0, payload)))

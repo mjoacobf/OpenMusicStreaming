@@ -32,7 +32,7 @@ class DownloadWorker(
     override suspend fun doWork(): Result {
         val type = inputData.getString(KEY_TYPE) ?: return Result.failure()
         val title = inputData.getString(KEY_TITLE).orEmpty()
-        promoteToForeground(title, 0, 0)
+        promoteToForeground(title, 0, 0, 0f)
         return try {
             when (type) {
                 TYPE_PLAYLIST -> {
@@ -41,19 +41,21 @@ class DownloadWorker(
                         url = url,
                         newTreeUri = inputData.getString(KEY_TREE),
                         newAutoUpdate = inputData.getBoolean(KEY_AUTO_UPDATE, true),
-                    ) { done, total -> updateNotification(title, done, total) }
+                    ) { done, total, fraction -> updateNotification(title, done, total, fraction) }
                 }
 
                 TYPE_SONG -> {
                     val id = inputData.getString(KEY_VIDEO_ID) ?: return Result.failure()
-                    syncer.downloadSingle(id, title, inputData.getString(KEY_TREE))
+                    syncer.downloadSingle(id, title, inputData.getString(KEY_TREE)) { p ->
+                        updateNotification(title, 0, 0, p)
+                    }
                 }
 
                 TYPE_AUTO -> {
                     library.autoUpdatePlaylists().forEach { playlist ->
                         runCatching {
-                            syncer.sync(playlist.remoteUrl, null, true) { d, t ->
-                                updateNotification(playlist.title, d, t)
+                            syncer.sync(playlist.remoteUrl, null, true) { d, t, f ->
+                                updateNotification(playlist.title, d, t, f)
                             }
                         }.onFailure { if (it is CancellationException) throw it }
                     }
@@ -70,9 +72,9 @@ class DownloadWorker(
         }
     }
 
-    private suspend fun promoteToForeground(title: String, done: Int, total: Int) {
+    private suspend fun promoteToForeground(title: String, done: Int, total: Int, fraction: Float) {
         try {
-            setForeground(foregroundInfo(title, done, total))
+            setForeground(foregroundInfo(title, done, total, fraction))
         } catch (_: Exception) {
             // En Android 12+ puede no permitirse desde segundo plano; la tarea sigue igual
         }
@@ -81,26 +83,35 @@ class DownloadWorker(
     /** Actualiza la notificación de progreso (limitado para no saturar el sistema). */
     private var lastUpdate = 0L
 
-    private fun updateNotification(title: String, done: Int, total: Int) {
+    private fun updateNotification(title: String, done: Int, total: Int, fraction: Float) {
         val now = System.currentTimeMillis()
-        if (done < total && now - lastUpdate < 1000) return
+        if (now - lastUpdate < 800) return
         lastUpdate = now
         try {
-            setForegroundAsync(foregroundInfo(title, done, total))
+            setForegroundAsync(foregroundInfo(title, done, total, fraction))
         } catch (_: Exception) {
         }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
-        foregroundInfo(inputData.getString(KEY_TITLE).orEmpty(), 0, 0)
+        foregroundInfo(inputData.getString(KEY_TITLE).orEmpty(), 0, 0, 0f)
 
-    private fun foregroundInfo(title: String, done: Int, total: Int): ForegroundInfo {
+    /** Notificación con porcentaje y, si es una playlist, canciones ya descargadas («37 % · 4/10 canciones»). */
+    private fun foregroundInfo(title: String, done: Int, total: Int, fraction: Float): ForegroundInfo {
         ensureChannel(applicationContext)
+        val percent = (fraction * 100).toInt().coerceIn(0, 100)
+        val indeterminate = total == 0 && fraction <= 0f
+        val text = when {
+            indeterminate -> "Preparando…"
+            total > 0 -> "$percent % · $done/$total canciones"
+            else -> "$percent %"
+        }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title.ifBlank { "Descargando música" })
-            .setContentText(if (total > 0) "$done / $total" else "Preparando…")
-            .setProgress(total, done, total == 0)
+            .setContentText(text)
+            .setSubText(if (indeterminate) null else "$percent %")
+            .setProgress(100, percent, indeterminate)
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)

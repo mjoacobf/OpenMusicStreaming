@@ -43,7 +43,8 @@ class PlaylistSyncer(
         url: String,
         newTreeUri: String?,
         newAutoUpdate: Boolean,
-        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+        /** `fraction` = avance global 0..1 (canciones completas + parte de las que se están bajando). */
+        onProgress: (done: Int, total: Int, fraction: Float) -> Unit = { _, _, _ -> },
     ) {
         val settings = settingsRepository.current()
         val key = url
@@ -92,6 +93,9 @@ class PlaylistSyncer(
         val total = playable.size
         val done = AtomicInteger(0)
         val failures = AtomicInteger(0)
+        val inflight = java.util.concurrent.ConcurrentHashMap<Int, Float>()
+        fun overall(): Float =
+            if (total == 0) 1f else ((done.get() + inflight.values.sum()) / total).coerceIn(0f, 1f)
         tracker.set(DownloadStatus(key, collection.title, DownloadStatus.State.RUNNING, 0f, 0, total))
 
         val downloadedSnapshot = DownloadedSnapshot(library.downloadedSongs())
@@ -106,15 +110,19 @@ class PlaylistSyncer(
                             folder = folder,
                             names = names,
                             library = downloadedSnapshot,
-                        )
+                        ) { p ->
+                            inflight[index] = p
+                            onProgress(done.get(), total, overall())
+                            tracker.set(
+                                DownloadStatus(key, collection.title, DownloadStatus.State.RUNNING, overall(), done.get(), total),
+                            )
+                        }
                         if (usedId == null) failures.incrementAndGet()
+                        inflight.remove(index)
                         val d = done.incrementAndGet()
-                        onProgress(d, total)
+                        onProgress(d, total, overall())
                         tracker.set(
-                            DownloadStatus(
-                                key, collection.title, DownloadStatus.State.RUNNING,
-                                if (total == 0) 1f else d.toFloat() / total, d, total,
-                            ),
+                            DownloadStatus(key, collection.title, DownloadStatus.State.RUNNING, overall(), d, total),
                         )
                         usedId
                     }
@@ -169,6 +177,7 @@ class PlaylistSyncer(
         folder: androidx.documentfile.provider.DocumentFile,
         names: MutableSet<String>,
         library: DownloadedSnapshot,
+        onSongProgress: (Float) -> Unit = {},
     ): String? {
         val videoId = item.id
         val song = this.library.getSong(videoId)
@@ -186,6 +195,7 @@ class PlaylistSyncer(
             val record: SongRecord = downloader.download(
                 videoId, track, folder, names,
                 settings.downloadAudioQuality, settings.downloadFormat, settings.embedCoverArt,
+                onSongProgress,
             )
             this.library.upsertSong(record)
             library.add(record)
@@ -239,7 +249,12 @@ class PlaylistSyncer(
     }
 
     /** Descarga una canción suelta a la subcarpeta "Canciones" (si no existe ya). */
-    suspend fun downloadSingle(videoId: String, title: String, newTreeUri: String?) {
+    suspend fun downloadSingle(
+        videoId: String,
+        title: String,
+        newTreeUri: String?,
+        onProgress: (Float) -> Unit = {},
+    ) {
         val settings = settingsRepository.current()
         val treeUri = newTreeUri ?: settings.downloadTreeUri ?: throw NoFolderException()
         if (!storage.hasPermission(treeUri)) throw NoFolderException()
@@ -267,7 +282,10 @@ class PlaylistSyncer(
                 settings.downloadAudioQuality,
                 settings.downloadFormat,
                 settings.embedCoverArt,
-            ) { p -> tracker.set(DownloadStatus(videoId, title, DownloadStatus.State.RUNNING, p)) }
+            ) { p ->
+                onProgress(p)
+                tracker.set(DownloadStatus(videoId, title, DownloadStatus.State.RUNNING, p))
+            }
             library.upsertSong(record)
             tracker.set(DownloadStatus(videoId, record.title, DownloadStatus.State.SUCCEEDED, 1f))
         } catch (e: CancellationException) {
