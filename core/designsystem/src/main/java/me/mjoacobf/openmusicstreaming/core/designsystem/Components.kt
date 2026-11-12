@@ -37,6 +37,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 
+/** Vacía la caché de carátulas (memoria y disco). Bloquea: llamar desde un hilo de E/S. */
+fun clearImageCache(context: android.content.Context) {
+    val loader = coil3.SingletonImageLoader.get(context)
+    loader.memoryCache?.clear()
+    loader.diskCache?.clear()
+}
+
 /** Carátula/miniatura con marcador de posición (Coil, con caché en disco). */
 @Composable
 fun Artwork(

@@ -94,7 +94,9 @@ class PlayHistoryRepository(db: AppDatabase) {
         }
     }
 
+    /** Cada canción aparece una sola vez: volver a escucharla sube su entrada al inicio. */
     suspend fun record(item: MediaSummary) {
+        dao.deleteByItem(item.id)
         dao.insert(
             PlayHistoryEntity(
                 itemId = item.id, url = item.url, type = item.type.name, title = item.title,
