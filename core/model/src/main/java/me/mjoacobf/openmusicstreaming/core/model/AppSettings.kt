@@ -49,6 +49,7 @@ data class AppSettings(
 
     // Reproducción
     val pauseOnAudioDeviceChange: Boolean = true,
+    val savePlayHistory: Boolean = true,
     val skipSilence: Boolean = false,
     val shuffle: Boolean = false,
     val repeatMode: RepeatModeSetting = RepeatModeSetting.OFF,
