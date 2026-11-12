@@ -19,6 +19,7 @@ import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
 import me.mjoacobf.openmusicstreaming.core.data.di.dataModule
 import me.mjoacobf.openmusicstreaming.core.download.DownloadManager
 import me.mjoacobf.openmusicstreaming.core.download.DownloadWorker
+import me.mjoacobf.openmusicstreaming.core.media.PlaybackService
 import me.mjoacobf.openmusicstreaming.core.download.di.downloadModule
 import me.mjoacobf.openmusicstreaming.core.extractor.YoutubeService
 import me.mjoacobf.openmusicstreaming.core.media.di.mediaModule
@@ -56,6 +57,15 @@ class OmsApplication : Application(), SingletonImageLoader.Factory, KoinComponen
         val youtube: YoutubeService = get()
         youtube.init(countryCode = "")
         DownloadWorker.ensureChannel(this)
+
+        // Al limpiar la app de Recientes: si no hay descargas en curso, el proceso termina por completo
+        PlaybackService.onAppClosed = {
+            val running = runCatching {
+                androidx.work.WorkManager.getInstance(this).getWorkInfosByTag("oms-downloads").get()
+                    .any { it.state == androidx.work.WorkInfo.State.RUNNING }
+            }.getOrDefault(true)
+            if (!running) android.os.Process.killProcess(android.os.Process.myPid())
+        }
 
         appScope.launch {
             val settings = get<SettingsRepository>().current()
