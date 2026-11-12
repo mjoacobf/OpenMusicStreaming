@@ -21,3 +21,6 @@ build/
 *.keystore
 keystore.properties
 dist/
+
+# graphify: grafo de conocimiento local (se regenera con 'graphify update .')
+graphify-out/
