@@ -39,6 +39,8 @@ class RemoteItemCallbacks(
     val onDownload: (MediaSummary) -> Unit,
     val onToggleBookmark: (MediaSummary, Boolean) -> Unit,
     val onAddToPlaylist: (MediaSummary) -> Unit,
+    /** Abre el perfil del artista (URL del canal). */
+    val onOpenArtist: (String) -> Unit = {},
 )
 
 fun MediaSummary.describe(): String {
@@ -47,7 +49,7 @@ fun MediaSummary.describe(): String {
         ItemType.VIDEO -> "Video"
         ItemType.PLAYLIST -> "Playlist"
         ItemType.ALBUM -> "Álbum"
-        ItemType.CHANNEL -> "Canal"
+        ItemType.CHANNEL -> "Artista"
     }
     return buildString {
         append(kind)
@@ -102,17 +104,26 @@ fun RemoteItemRow(
                     DropdownMenuItem(text = { Text("Añadir a la cola") }, onClick = { menu = false; callbacks.onAddToQueue(item) })
                     DropdownMenuItem(text = { Text("Añadir a playlist…") }, onClick = { menu = false; callbacks.onAddToPlaylist(item) })
                 } else {
-                    DropdownMenuItem(text = { Text("Abrir") }, onClick = { menu = false; callbacks.onOpen(item) })
+                    DropdownMenuItem(
+                        text = { Text(if (item.type == ItemType.CHANNEL) "Ver perfil" else "Abrir") },
+                        onClick = { menu = false; callbacks.onOpen(item) },
+                    )
                 }
-                DropdownMenuItem(
-                    text = { Text(if (item.isCollection) "Descargar todo" else "Descargar") },
-                    onClick = { menu = false; callbacks.onDownload(item) },
-                )
-                DropdownMenuItem(
-                    text = { Text(if (bookmarked) "Quitar de marcadores" else "Añadir a marcadores") },
-                    leadingIcon = { Icon(if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder, null) },
-                    onClick = { menu = false; callbacks.onToggleBookmark(item, bookmarked) },
-                )
+                val artistUrl = item.artistUrl
+                if (artistUrl != null && item.type != ItemType.CHANNEL) {
+                    DropdownMenuItem(text = { Text("Ver artista") }, onClick = { menu = false; callbacks.onOpenArtist(artistUrl) })
+                }
+                if (item.type != ItemType.CHANNEL) {
+                    DropdownMenuItem(
+                        text = { Text(if (item.isCollection) "Descargar todo" else "Descargar") },
+                        onClick = { menu = false; callbacks.onDownload(item) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (bookmarked) "Quitar de marcadores" else "Añadir a marcadores") },
+                        leadingIcon = { Icon(if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder, null) },
+                        onClick = { menu = false; callbacks.onToggleBookmark(item, bookmarked) },
+                    )
+                }
             }
         }
     }

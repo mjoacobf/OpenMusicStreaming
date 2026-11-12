@@ -62,7 +62,10 @@ class StreamDetailViewModel(
     }
 
     fun summary(): MediaSummary? = _state.value.details?.let {
-        MediaSummary(it.url, it.id, ItemType.SONG, it.title, it.uploader, it.thumbnailUrl, it.durationSec)
+        MediaSummary(
+            it.url, it.id, ItemType.SONG, it.title, it.uploader, it.thumbnailUrl, it.durationSec,
+            artistUrl = it.uploaderUrl,
+        )
     }
 }
 

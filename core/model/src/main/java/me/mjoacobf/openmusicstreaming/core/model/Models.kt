@@ -12,6 +12,7 @@ enum class SearchFilter {
     MUSIC_VIDEOS,
     MUSIC_ALBUMS,
     MUSIC_PLAYLISTS,
+    MUSIC_ARTISTS,
 }
 
 /**
@@ -25,10 +26,13 @@ enum class MusicService(val label: String, val idPrefix: String, val filters: Li
         "YouTube Music", "",
         listOf(
             SearchFilter.MUSIC_SONGS, SearchFilter.MUSIC_VIDEOS,
-            SearchFilter.MUSIC_ALBUMS, SearchFilter.MUSIC_PLAYLISTS,
+            SearchFilter.MUSIC_ALBUMS, SearchFilter.MUSIC_PLAYLISTS, SearchFilter.MUSIC_ARTISTS,
         ),
     ),
-    SOUNDCLOUD("SoundCloud", "sc:", listOf(SearchFilter.MUSIC_SONGS, SearchFilter.MUSIC_PLAYLISTS)),
+    SOUNDCLOUD(
+        "SoundCloud", "sc:",
+        listOf(SearchFilter.MUSIC_SONGS, SearchFilter.MUSIC_PLAYLISTS, SearchFilter.MUSIC_ARTISTS),
+    ),
 
     /** Bandcamp no ofrece filtros: la búsqueda mezcla pistas y álbumes. */
     BANDCAMP("Bandcamp", "bc:", emptyList()),
@@ -78,6 +82,8 @@ data class MediaSummary(
     val thumbnailUrl: String?,
     val durationSec: Long = -1,
     val itemCount: Long = -1,
+    /** Canal/perfil del artista, si el servicio lo informa (permite abrir su perfil desde el reproductor). */
+    val artistUrl: String? = null,
 ) {
     val isPlayable: Boolean get() = type == ItemType.SONG || type == ItemType.VIDEO
     val service: MusicService get() = MusicService.ofUrl(url)
@@ -98,6 +104,7 @@ data class StreamDetails(
     val url: String,
     val title: String,
     val uploader: String,
+    val uploaderUrl: String?,
     val thumbnailUrl: String?,
     val durationSec: Long,
     val viewCount: Long,

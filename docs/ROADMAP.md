@@ -1,3 +1,19 @@
+# Hoja de ruta
+
+## Versión 1.02 — IMPLEMENTADA (emulador API 36, debug)
+| Ítem | Resultado |
+|---|---|
+| Historial sin duplicados | Hecho (una fila por canción, más reciente primero). Solo lógica/compilación. |
+| Artistas en la búsqueda + perfil | OK: filtro Artistas (YouTube Music y SoundCloud), perfil con canciones/álbumes/videos/playlists y búsqueda dentro del artista. |
+| Ver artista / álbum desde el reproductor | OK (el álbum se busca por nombre; puede fallar con canciones sueltas). |
+| Letras (LRCLIB, experimental) | OK: sincronizadas con línea activa; caché en disco. |
+| Limpiar caché / borrar datos | Caché probada; «Borrar datos» solo compilada. |
+| Búsqueda en Biblioteca | Hecho (filtro local por pestaña). Sin probar en emulador. |
+| Aviso de actualización | Hecho (GitHub releases, una vez por inicio, opcional). Pendiente probar con un release más nuevo publicado. |
+| Versión | `versionName 1.02`, `versionCode 3`. Room sin cambios (v2). |
+
+Pendiente para publicar: firmar el release (necesita `keystore.properties` + `release.jks`) y crear el release `v1.02` en GitHub.
+
 # Hoja de ruta — versión 1.01
 
 **Estado: IMPLEMENTADA y verificada en emulador (API 36, release firmado, actualización 1.0→1.01 sobre datos existentes).** Sin commitear aún.

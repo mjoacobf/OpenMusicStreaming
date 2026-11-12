@@ -60,6 +60,7 @@ fun CollectionScreen(
     viewModel: CollectionViewModel,
     onBack: () -> Unit,
     onOpenStream: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
     onOpenLocalPlaylist: (Long) -> Unit,
     onOpenPlayer: () -> Unit,
 ) {
@@ -86,6 +87,7 @@ fun CollectionScreen(
             onDownload = { downloadTarget = it },
             onToggleBookmark = { item, b -> actions.toggleBookmark(scope, item, b) },
             onAddToPlaylist = { playlistTarget = it },
+            onOpenArtist = onOpenArtist,
         )
     }
 

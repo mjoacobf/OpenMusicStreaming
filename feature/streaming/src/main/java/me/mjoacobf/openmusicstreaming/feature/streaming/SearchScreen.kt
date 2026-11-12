@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import me.mjoacobf.openmusicstreaming.core.designsystem.EmptyState
 import me.mjoacobf.openmusicstreaming.core.designsystem.ErrorBox
 import me.mjoacobf.openmusicstreaming.core.designsystem.LoadingBox
+import me.mjoacobf.openmusicstreaming.core.model.ItemType
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
 import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.SearchFilter
@@ -57,6 +58,7 @@ private fun SearchFilter.label() = when (this) {
     SearchFilter.MUSIC_VIDEOS -> "Videos musicales"
     SearchFilter.MUSIC_ALBUMS -> "Álbumes"
     SearchFilter.MUSIC_PLAYLISTS -> "Playlists"
+    SearchFilter.MUSIC_ARTISTS -> "Artistas"
 }
 
 @Composable
@@ -64,6 +66,7 @@ fun SearchScreen(
     viewModel: SearchViewModel,
     onOpenStream: (String) -> Unit,
     onOpenCollection: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
     onOpenPlayer: () -> Unit,
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -89,7 +92,13 @@ fun SearchScreen(
 
     val callbacks = remember(viewModel) {
         RemoteItemCallbacks(
-            onOpen = { if (it.isCollection) onOpenCollection(it.url) else onOpenStream(it.url) },
+            onOpen = {
+                when {
+                    it.type == ItemType.CHANNEL -> onOpenArtist(it.url)
+                    it.isCollection -> onOpenCollection(it.url)
+                    else -> onOpenStream(it.url)
+                }
+            },
             onPlay = { viewModel.actions.play(it) },
             onPlayVideo = { viewModel.actions.play(it, asVideo = true); onOpenPlayer() },
             onPlayNext = viewModel.actions::playNext,
@@ -97,6 +106,7 @@ fun SearchScreen(
             onDownload = { downloadTarget = it },
             onToggleBookmark = { item, b -> viewModel.actions.toggleBookmark(scope, item, b) },
             onAddToPlaylist = { playlistTarget = it },
+            onOpenArtist = onOpenArtist,
         )
     }
 
@@ -153,7 +163,7 @@ fun SearchScreen(
                     state.results.isEmpty() && state.submittedQuery.isEmpty() -> EmptyState(
                         Icons.Rounded.TravelExplore,
                         "Explora música",
-                        "Busca canciones, álbumes y playlists en YouTube Music, SoundCloud o Bandcamp. También puedes pegar un enlace, incluso de contenido no listado.",
+                        "Busca canciones, artistas, álbumes y playlists en YouTube Music, SoundCloud o Bandcamp. También puedes pegar un enlace, incluso de contenido no listado.",
                     )
                     state.results.isEmpty() -> EmptyState(Icons.Rounded.Search, "Sin resultados", "Prueba con otro término o filtro.")
                     else -> ResultList(state, bookmarked, downloaded, callbacks, viewModel::loadMore)

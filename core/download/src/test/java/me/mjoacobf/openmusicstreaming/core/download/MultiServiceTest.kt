@@ -37,7 +37,7 @@ class MultiServiceTest {
 
     @Test
     fun `solo hay filtros musicales`() {
-        assertEquals(4, MusicService.YOUTUBE.filters.size)
+        assertEquals(5, MusicService.YOUTUBE.filters.size)
         assertTrue(MusicService.BANDCAMP.filters.isEmpty())
     }
 

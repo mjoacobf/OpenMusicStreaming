@@ -44,6 +44,10 @@ data class RemoteCollectionRoute(val url: String) : NavKey
 @Serializable
 data class StreamDetailRoute(val url: String) : NavKey
 
+/** Perfil de un artista (canal de YouTube Music, SoundCloud o Bandcamp). */
+@Serializable
+data class ArtistRoute(val url: String) : NavKey
+
 /** Reproductor a pantalla completa. */
 @Serializable
 data object NowPlayingRoute : NavKey

@@ -7,6 +7,8 @@ import me.mjoacobf.openmusicstreaming.core.database.AppDatabase
 import me.mjoacobf.openmusicstreaming.core.database.SearchHistoryEntity
 import me.mjoacobf.openmusicstreaming.core.extractor.LinkTarget
 import me.mjoacobf.openmusicstreaming.core.extractor.YoutubeService
+import me.mjoacobf.openmusicstreaming.core.model.ArtistProfile
+import me.mjoacobf.openmusicstreaming.core.model.ArtistSection
 import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
 import me.mjoacobf.openmusicstreaming.core.model.MusicService
 import me.mjoacobf.openmusicstreaming.core.model.PageToken
@@ -49,6 +51,20 @@ class StreamingRepository(
     suspend fun collection(url: String): RemoteCollection = youtube.collection(url)
 
     suspend fun collectionMore(url: String, page: PageToken): PagedItems = youtube.collectionMore(url, page)
+
+    // Artistas
+
+    suspend fun artist(url: String): ArtistProfile = youtube.artist(url)
+
+    suspend fun artistItems(profile: ArtistProfile, section: ArtistSection, query: String, page: PageToken?): PagedItems =
+        youtube.artistItems(profile, section, query, page)
+
+    /** URL del perfil de un artista a partir de su nombre (para canciones sin enlace guardado). */
+    suspend fun findArtistUrl(name: String, service: MusicService): String? = youtube.findArtistUrl(name, service)
+
+    /** URL del álbum de una canción (búsqueda por nombre de álbum, o de canción si no se conoce). */
+    suspend fun findAlbumUrl(albumOrTitle: String, artist: String, service: MusicService): String? =
+        youtube.findAlbumUrl(albumOrTitle, artist, service)
 
     fun history(prefix: String, enabled: Boolean): Flow<List<String>> =
         if (!enabled) flowOf(emptyList()) else historyDao.observe(prefix).map { l -> l.map { it.query } }

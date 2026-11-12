@@ -2,6 +2,9 @@ package me.mjoacobf.openmusicstreaming.core.data.di
 
 import me.mjoacobf.openmusicstreaming.core.data.BookmarkRepository
 import me.mjoacobf.openmusicstreaming.core.data.LibraryRepository
+import me.mjoacobf.openmusicstreaming.core.data.LyricsRepository
+import me.mjoacobf.openmusicstreaming.core.data.MaintenanceRepository
+import me.mjoacobf.openmusicstreaming.core.data.UpdateRepository
 import me.mjoacobf.openmusicstreaming.core.data.PlayHistoryRepository
 import me.mjoacobf.openmusicstreaming.core.data.SettingsRepository
 import me.mjoacobf.openmusicstreaming.core.data.StreamingRepository
@@ -31,4 +34,7 @@ val dataModule = module {
     single { UserPlaylistRepository(get()) }
     single { PlayHistoryRepository(get()) }
     single { StreamingRepository(get(), get()) }
+    single { LyricsRepository(androidContext(), get()) }
+    single { UpdateRepository(androidContext(), get()) }
+    single { MaintenanceRepository(androidContext(), get(), get(), get()) }
 }

@@ -70,6 +70,8 @@ fun OmsApp(navigationRequests: Flow<NavKey>) {
         navigationRequests.collect { navigator.navigate(it) }
     }
 
+    UpdatePrompt()
+
     val current = topLevel.backStack.lastOrNull()
     val showChrome = current != NowPlayingRoute
 

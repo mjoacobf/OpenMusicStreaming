@@ -87,6 +87,11 @@ class DownloadManager(
 
     fun dismiss(key: String) = tracker.remove(key)
 
+    /** Cancela todas las descargas y sincronizaciones pendientes o en curso. */
+    fun cancelAll() {
+        workManager.cancelAllWorkByTag(TAG)
+    }
+
     /** Programa (o reprograma) la actualización automática periódica. */
     fun scheduleAutoUpdate(intervalHours: Int, wifiOnly: Boolean) {
         if (intervalHours <= 0) {

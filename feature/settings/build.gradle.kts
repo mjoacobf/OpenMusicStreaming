@@ -9,5 +9,6 @@ android {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:download"))
+    implementation(project(":core:media"))
     implementation(libs.androidx.activity.compose)
 }
