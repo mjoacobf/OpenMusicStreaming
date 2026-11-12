@@ -8,32 +8,39 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.mjoacobf.openmusicstreaming.core.data.LibraryRepository
+import me.mjoacobf.openmusicstreaming.core.data.UserPlaylistRepository
 import me.mjoacobf.openmusicstreaming.core.download.DownloadManager
 import me.mjoacobf.openmusicstreaming.core.media.PlayerConnection
 import me.mjoacobf.openmusicstreaming.core.media.toMediaItem
 import me.mjoacobf.openmusicstreaming.core.model.DownloadStatus
+import me.mjoacobf.openmusicstreaming.core.model.ItemType
 import me.mjoacobf.openmusicstreaming.core.model.LocalPlaylist
+import me.mjoacobf.openmusicstreaming.core.model.MediaSummary
 import me.mjoacobf.openmusicstreaming.core.model.Song
+import me.mjoacobf.openmusicstreaming.core.model.UserPlaylist
 
 data class LibraryUiState(
     val loading: Boolean = true,
     val playlists: List<LocalPlaylist> = emptyList(),
     val songs: List<Song> = emptyList(),
     val downloads: Map<String, DownloadStatus> = emptyMap(),
+    val userPlaylists: List<UserPlaylist> = emptyList(),
 )
 
 class LibraryViewModel(
     private val library: LibraryRepository,
     private val downloads: DownloadManager,
     private val player: PlayerConnection,
+    private val userPlaylists: UserPlaylistRepository,
 ) : ViewModel() {
 
     val state: StateFlow<LibraryUiState> = combine(
         library.observePlaylists(),
         library.observeDownloadedSongs(),
         downloads.statuses,
-    ) { playlists, songs, statuses ->
-        LibraryUiState(false, playlists, songs, statuses)
+        userPlaylists.observeAll(),
+    ) { playlists, songs, statuses, mine ->
+        LibraryUiState(false, playlists, songs, statuses, mine)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     fun setAutoUpdate(playlist: LocalPlaylist, enabled: Boolean) = viewModelScope.launch {
@@ -63,6 +70,20 @@ class LibraryViewModel(
     fun dismissDownload(key: String) = downloads.dismiss(key)
 
     fun cancelDownload(key: String) = downloads.cancel(key)
+
+    // Playlists propias
+
+    fun createPlaylist(name: String) = viewModelScope.launch { userPlaylists.create(name) }
+
+    fun addSongToPlaylist(playlistId: Long, song: Song) = viewModelScope.launch {
+        userPlaylists.add(playlistId, listOf(song.toSummary()))
+    }
+
+    fun createPlaylistWith(name: String, song: Song) = viewModelScope.launch {
+        userPlaylists.add(userPlaylists.create(name), listOf(song.toSummary()))
+    }
+
+    private fun Song.toSummary() = MediaSummary(url, videoId, ItemType.SONG, title, artist, thumbnailUrl, durationSec)
 }
 
 class PlaylistViewModel(

@@ -15,7 +15,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.LibraryMusic
@@ -53,7 +56,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.mjoacobf.openmusicstreaming.core.designsystem.AddToPlaylistDialog
 import me.mjoacobf.openmusicstreaming.core.designsystem.Artwork
+import me.mjoacobf.openmusicstreaming.core.designsystem.PlaylistNameDialog
 import me.mjoacobf.openmusicstreaming.core.designsystem.EmptyState
 import me.mjoacobf.openmusicstreaming.core.designsystem.LoadingBox
 import me.mjoacobf.openmusicstreaming.core.designsystem.MediaRow
@@ -61,6 +66,7 @@ import me.mjoacobf.openmusicstreaming.core.model.DownloadStatus
 import me.mjoacobf.openmusicstreaming.core.model.ItemType
 import me.mjoacobf.openmusicstreaming.core.model.LocalPlaylist
 import me.mjoacobf.openmusicstreaming.core.model.Song
+import me.mjoacobf.openmusicstreaming.core.model.UserPlaylist
 import me.mjoacobf.openmusicstreaming.core.model.formatDuration
 import java.text.DateFormat
 import java.util.Date
@@ -70,17 +76,22 @@ import java.util.Date
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenPlaylist: (Long) -> Unit,
+    onOpenUserPlaylist: (Long) -> Unit,
+    onOpenHistory: () -> Unit,
     onExplore: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var toDelete by remember { mutableStateOf<LocalPlaylist?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var songForPlaylist by remember { mutableStateOf<Song?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Biblioteca") },
                 actions = {
+                    IconButton(onClick = onOpenHistory) { Icon(Icons.Rounded.History, "Historial") }
                     if (state.playlists.isNotEmpty()) {
                         IconButton(onClick = viewModel::syncAll) {
                             Icon(Icons.Rounded.Sync, "Actualizar playlists automáticas")
@@ -96,6 +107,12 @@ fun LibraryScreen(
                     icon = { Icon(Icons.Rounded.Shuffle, null) },
                     text = { Text("Aleatorio") },
                 )
+            } else if (tab == 2) {
+                ExtendedFloatingActionButton(
+                    onClick = { creating = true },
+                    icon = { Icon(Icons.Rounded.Add, null) },
+                    text = { Text("Nueva playlist") },
+                )
             }
         },
     ) { padding ->
@@ -103,10 +120,21 @@ fun LibraryScreen(
             PrimaryTabRow(selectedTabIndex = tab) {
                 Tab(tab == 0, { tab = 0 }, text = { Text("Playlists (${state.playlists.size})") })
                 Tab(tab == 1, { tab = 1 }, text = { Text("Canciones (${state.songs.size})") })
+                Tab(tab == 2, { tab = 2 }, text = { Text("Mis listas (${state.userPlaylists.size})") })
             }
             ActiveDownloads(state.downloads.values.toList(), viewModel::dismissDownload, viewModel::cancelDownload)
             when {
                 state.loading -> LoadingBox()
+                tab == 2 && state.userPlaylists.isEmpty() -> EmptyState(
+                    Icons.Rounded.PlaylistAdd,
+                    "Crea tu primera playlist",
+                    "Mezcla canciones de streaming y descargadas en tus propias listas.",
+                    actionLabel = "Nueva playlist",
+                    onAction = { creating = true },
+                )
+
+                tab == 2 -> UserPlaylistList(state.userPlaylists, onOpenUserPlaylist)
+
                 tab == 0 && state.playlists.isEmpty() -> EmptyState(
                     Icons.Rounded.LibraryMusic,
                     "Aún no hay playlists descargadas",
@@ -136,9 +164,27 @@ fun LibraryScreen(
                     onPlayNext = viewModel::playNext,
                     onAddToQueue = viewModel::addToQueue,
                     onDelete = viewModel::deleteSong,
+                    onAddToPlaylist = { songForPlaylist = it },
                 )
             }
         }
+    }
+
+    if (creating) {
+        PlaylistNameDialog(
+            title = "Nueva playlist",
+            confirmLabel = "Crear",
+            onConfirm = { viewModel.createPlaylist(it); creating = false },
+            onDismiss = { creating = false },
+        )
+    }
+    songForPlaylist?.let { song ->
+        AddToPlaylistDialog(
+            playlists = state.userPlaylists,
+            onPick = { viewModel.addSongToPlaylist(it.id, song); songForPlaylist = null },
+            onCreate = { viewModel.createPlaylistWith(it, song); songForPlaylist = null },
+            onDismiss = { songForPlaylist = null },
+        )
     }
 
     toDelete?.let { playlist ->
@@ -281,6 +327,7 @@ internal fun SongList(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onDelete: (Song) -> Unit,
+    onAddToPlaylist: ((Song) -> Unit)? = null,
     missing: Set<String> = emptySet(),
     header: (@Composable () -> Unit)? = null,
 ) {
@@ -294,6 +341,7 @@ internal fun SongList(
                 onPlayNext = { onPlayNext(song) },
                 onAddToQueue = { onAddToQueue(song) },
                 onDelete = { onDelete(song) },
+                onAddToPlaylist = onAddToPlaylist?.let { add -> { add(song) } },
             )
         }
     }
@@ -307,6 +355,7 @@ private fun SongRow(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onDelete: () -> Unit,
+    onAddToPlaylist: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
     val subtitle = buildString {
@@ -334,7 +383,36 @@ private fun SongRow(
             DropdownMenu(menu, { menu = false }) {
                 DropdownMenuItem(text = { Text("Reproducir a continuación") }, onClick = { menu = false; onPlayNext() })
                 DropdownMenuItem(text = { Text("Añadir a la cola") }, onClick = { menu = false; onAddToQueue() })
+                if (onAddToPlaylist != null) {
+                    DropdownMenuItem(text = { Text("Añadir a playlist…") }, onClick = { menu = false; onAddToPlaylist() })
+                }
                 DropdownMenuItem(text = { Text("Eliminar descarga") }, onClick = { menu = false; onDelete() })
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserPlaylistList(playlists: List<UserPlaylist>, onOpen: (Long) -> Unit) {
+    LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
+        items(playlists, key = { it.id }, contentType = { "user-playlist" }) { playlist ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(playlist.id) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Artwork(playlist.coverUrl, size = 64.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(playlist.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "${playlist.itemCount} canciones",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
