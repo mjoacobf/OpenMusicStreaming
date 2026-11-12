@@ -61,4 +61,4 @@ scripts/adb-ui.sh prep; scripts/adb-ui.sh tap "Ajustes"; scripts/adb-ui.sh shot 
 ## v1.01 (emulador API 36, release firmado instalado sobre la v1.0)
 Verificado: migración Room 1→2 (la app abre), búsqueda y reproducción SoundCloud (HLS), búsqueda Bandcamp, descarga de álbum Bandcamp (18 MP3; `ffmpeg -i` muestra título/artista/álbum/pista y carátula 544×544),
 notificación de descarga («10 % · 1/18 canciones»), historial, crear playlist propia, cola reordenable (`adb shell input draganddrop x y x2 y2 1500`), limpiar Recientes (`KEYCODE_APP_SWITCH` + swipe → sin sesión ni proceso).
-Pruebas unitarias: 14 (`DownloadLogicTest` 6 + `MultiServiceTest` 8). Pendiente: descarga HLS de SoundCloud, enlaces SC/BC pegados, sincronizar playlists de esos servicios, pausa con audífonos (dispositivo real).
+Pruebas unitarias: 14 (`DownloadLogicTest` 6 + `MultiServiceTest` 8). Descarga SoundCloud (HLS AAC fMP4 → M4A) verificada con ffmpeg. Pendiente: enlaces SC/BC pegados, sincronizar playlists de esos servicios, pausa con audífonos (dispositivo real).

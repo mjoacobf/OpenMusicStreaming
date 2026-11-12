@@ -94,6 +94,7 @@ app ─► feature:{library,streaming,player,bookmarks,settings} ─► core:{da
   `SettingsScreen.kt:223`: es una limitación del parser (lambda con desestructurado), el código compila.
 
 - **Scripts Python/shell:** los heredocs con comillas triples fallan en el shell; escribir el script con Write y ejecutarlo.
+- Descargas de SoundCloud: casi todas las pistas solo tienen HLS (AAC fMP4); ya soportado. Las URLs se resuelven al vuelo, no hay tokens que guardar.
 - **Emulador con v1.0 firmada con release:** para probar la migración instalar el release firmado (`install -r`), no el debug.
 
 ## Secretos

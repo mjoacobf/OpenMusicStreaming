@@ -7,11 +7,11 @@ Resumen de lo hecho y de lo que queda abierto:
 |---|---|
 | A1 Recientes | OK: sigue sonando en Recientes; al limpiarla se detiene la sesión y muere el proceso (salvo descargas). Probado. |
 | A2 Notificación | OK: «10 % · 1/18 canciones» con barra (probado con `dumpsys notification`). |
-| A3 Solo música | OK: filtros reducidos y recomendados filtrados. Abierto: ¿bloquear también enlaces de videos no musicales? |
+| A3 Solo música | OK: filtros reducidos y recomendados filtrados. Los enlaces de videos no musicales pegados se siguen abriendo (decisión del usuario). |
 | A4 Portadas | Hecho: miniaturas 544 px en listas, 1080 en cabeceras/reproductor (reescritura de tamaño en URLs googleusercontent), carátula local 600 px, embebida ≤42 KB. No comparado visualmente contra la v1.0. |
 | A5 Cola | OK: mantener y arrastrar (probado con `input draganddrop`); tocar reproduce. |
 | B1 Playlists propias | OK: pestaña «Mis listas», añadir desde Explorar/reproductor/Canciones, reordenar, renombrar, eliminar. Crear probado; añadir/reordenar de playlist propia solo compilado. |
-| B2 SoundCloud/Bandcamp | OK: búsqueda, reproducción (HLS SoundCloud, release/R8) y descarga de álbum Bandcamp (MP3 + ID3 + carátula, validado con ffmpeg). Sin probar: descarga HLS de SoundCloud, enlaces pegados, actualización de playlists de estos servicios. |
+| B2 SoundCloud/Bandcamp | OK: búsqueda, reproducción (HLS SoundCloud, release/R8) y descarga de álbum Bandcamp (MP3 + ID3 + carátula, validado con ffmpeg). Descarga de SoundCloud (HLS AAC → M4A de 29:38 con etiquetas y carátula, decodifica sin errores) probada. Sin probar: enlaces pegados, actualización de playlists de estos servicios. |
 | B3 Historial | OK: pantalla (icono en Biblioteca), ajustes para activar/borrar. |
 | Nombre/versión | «Open Music Streaming», `versionName 1.01`, `versionCode 2`. |
 
