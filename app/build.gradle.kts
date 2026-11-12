@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "me.mjoacobf.openmusicstreaming"
-        versionCode = 3
-        versionName = "1.02"
+        versionCode = 4
+        versionName = "1.021"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
