@@ -21,11 +21,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -35,6 +39,8 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -43,6 +49,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -50,6 +58,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -84,14 +94,38 @@ import me.mjoacobf.openmusicstreaming.core.model.upscaleThumbnail
 
 @kotlin.OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
+fun NowPlayingScreen(
+    viewModel: PlayerViewModel,
+    onClose: () -> Unit,
+    onOpenArtist: (String) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val bookmarked by viewModel.bookmarkedUrls.collectAsStateWithLifecycle()
     var showQueue by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    val lyricsState by viewModel.lyrics.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val item = state.currentItem
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PlayerViewModel.Event.OpenArtist -> onOpenArtist(event.url)
+                is PlayerViewModel.Event.OpenAlbum -> onOpenAlbum(event.url)
+                is PlayerViewModel.Event.Message -> snackbar.showSnackbar(event.text)
+            }
+        }
+    }
+    // La letra se busca al abrir el panel y al cambiar de canción mientras está visible
+    val currentItem = state.currentItem
+    LaunchedEffect(currentItem?.mediaId, showLyrics) {
+        if (showLyrics && currentItem != null) viewModel.loadLyrics(currentItem)
+    }
 
     // En segundo plano se desactiva la pista de video para ahorrar datos y batería
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -108,6 +142,7 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Reproduciendo") },
@@ -122,10 +157,40 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
                             )
                         }
                     }
-                    if (item?.toSummary() != null) {
-                        IconButton(onClick = { showAddToPlaylist = true }) { Icon(Icons.Rounded.PlaylistAdd, "Añadir a playlist") }
+                    if (item != null) {
+                        IconButton(onClick = { showLyrics = !showLyrics }) {
+                            Icon(
+                                Icons.Rounded.Lyrics,
+                                if (showLyrics) "Ocultar letra" else "Mostrar letra",
+                                tint = if (showLyrics) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Cola") }
+                    if (item != null) {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Rounded.MoreVert, "Más opciones")
+                            DropdownMenu(menu, { menu = false }) {
+                                if (item.toSummary() != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Añadir a playlist…") },
+                                        leadingIcon = { Icon(Icons.Rounded.PlaylistAdd, null) },
+                                        onClick = { menu = false; showAddToPlaylist = true },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("Ver artista") },
+                                    leadingIcon = { Icon(Icons.Rounded.Person, null) },
+                                    onClick = { menu = false; viewModel.openArtist(item) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Ver álbum") },
+                                    leadingIcon = { Icon(Icons.Rounded.Album, null) },
+                                    onClick = { menu = false; viewModel.openAlbum(item) },
+                                )
+                            }
+                        }
+                    }
                 },
             )
         },
@@ -147,7 +212,9 @@ fun NowPlayingScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                if (state.hasVideo && MediaIds.isVideo(item.mediaId)) {
+                if (showLyrics) {
+                    LyricsPanel(lyricsState, viewModel, onRetry = { viewModel.retryLyrics(item) })
+                } else if (state.hasVideo && MediaIds.isVideo(item.mediaId)) {
                     VideoSurface(viewModel.connection.player)
                 } else {
                     Artwork(
