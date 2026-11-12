@@ -6,7 +6,7 @@ Bandcamp**, y guarda lo que quieras en una carpeta de tu dispositivo, con etique
 
 **No requiere cuenta ni inicio de sesión**, no tiene publicidad y no envía datos personales.
 
-> Versión actual: **1.02**. Licencia [GPLv3](LICENSE).
+> Versión actual: **1.021**. Licencia [GPLv3](LICENSE).
 
 ## Capturas de pantalla
 
@@ -52,6 +52,7 @@ Bandcamp**, y guarda lo que quieras en una carpeta de tu dispositivo, con etique
 - **Actualización automática de playlists**: se descargan las canciones nuevas y lo que ya tienes se conserva aunque desaparezca de la plataforma.
 - Una canción compartida entre playlists se guarda **una sola vez**.
 - **Búsqueda en la biblioteca** (canciones, playlists y listas propias).
+- **Analizar carpeta de descargas** (menú ⋮ de Biblioteca): recupera las canciones que ya descargaste si desinstalaste y reinstalaste la app.
 - **Playlists propias** que mezclan canciones de streaming y descargadas, con orden editable.
 - **Historial de reproducción**
 

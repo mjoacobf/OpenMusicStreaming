@@ -14,7 +14,7 @@ import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
 val libraryModule = module {
-    viewModel { LibraryViewModel(get(), get(), get(), get()) }
+    viewModel { LibraryViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { params -> UserPlaylistViewModel(params.get(), get(), get(), get()) }
     viewModel { HistoryViewModel(get(), get(), get()) }
     viewModel { params -> PlaylistViewModel(params.get(), get(), get(), get()) }

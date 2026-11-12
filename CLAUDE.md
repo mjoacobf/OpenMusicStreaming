@@ -8,8 +8,8 @@ Sin cuentas ni inicio de sesión. Licencia **GPLv3** (usa NewPipeExtractor y có
 **Usuario:** hispanohablante; prefiere respuestas directas y verificadas (probó todo en emulador antes de dar por bueno).
 
 ## Estado
-- **v1.02** (`versionCode 3`): artistas, letras (LRCLIB, experimental), ver artista/álbum, búsqueda en biblioteca, limpiar caché/datos, aviso de actualización, historial sin duplicados. Antes: **v1.01** (`versionCode 2`), probada en emulador API 36 (release firmado ~4,3 MB). Detalle y huecos de verificación en `docs/ROADMAP.md`.
-- La v1.01 ya está fusionada en `main`. La v1.02 se trabaja en la rama `feat/v1.02`. No fusionar a `main` sin que lo pidan.
+- **v1.021** (`versionCode 4`): «Analizar carpeta de descargas» en Biblioteca (recupera canciones tras reinstalar). Antes, **v1.02** (`versionCode 3`): artistas, letras (LRCLIB, experimental), ver artista/álbum, búsqueda en biblioteca, limpiar caché/datos, aviso de actualización, historial sin duplicados. Antes: **v1.01** (`versionCode 2`), probada en emulador API 36 (release firmado ~4,3 MB). Detalle y huecos de verificación en `docs/ROADMAP.md`.
+- La v1.01 ya está fusionada en `main`. La v1.02/v1.021 se trabajan en la rama `feat/v1.02`. No fusionar a `main` sin que lo pidan.
 - Novedades v1.01: SoundCloud/Bandcamp (ids `sc:`/`bc:`), playlists propias, historial, cola arrastrable, notificación con %, cierre al limpiar Recientes, Room v2.
 - **Del usuario (no tocar ni commitear)**: `obs.md` (notas de trabajo), `.idea/`, `gradle.properties` con cambios locales.
 
@@ -45,7 +45,7 @@ graphify god-nodes --top 15                  # núcleos de la arquitectura
 ```
 ./gradlew :app:assembleDebug                  # APK debug (~29 MB) → app/build/outputs/apk/debug/
 ./gradlew :app:assembleRelease                # release + R8 firmado → app/build/outputs/apk/release/app-release.apk
-./gradlew :core:download:testDebugUnitTest    # pruebas unitarias (19)
+./gradlew :core:download:testDebugUnitTest    # pruebas unitarias (24)
 ./gradlew :<modulo>:compileDebugKotlin -q     # compilación rápida de un módulo
 ```
 Entorno: Windows 11, Git Bash. JDK 25, Gradle 9.5.0, AGP 9.3.3 (Kotlin integrado: **no** aplicar `kotlin-android`),

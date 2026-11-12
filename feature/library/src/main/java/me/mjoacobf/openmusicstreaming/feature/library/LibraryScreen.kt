@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
@@ -70,6 +71,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.mjoacobf.openmusicstreaming.core.designsystem.AddToPlaylistDialog
 import me.mjoacobf.openmusicstreaming.core.designsystem.Artwork
 import me.mjoacobf.openmusicstreaming.core.designsystem.PlaylistNameDialog
+import me.mjoacobf.openmusicstreaming.core.designsystem.readableFolder
+import me.mjoacobf.openmusicstreaming.core.designsystem.rememberFolderPicker
 import me.mjoacobf.openmusicstreaming.core.designsystem.EmptyState
 import me.mjoacobf.openmusicstreaming.core.designsystem.LoadingBox
 import me.mjoacobf.openmusicstreaming.core.designsystem.MediaRow
@@ -117,6 +120,9 @@ fun LibraryScreen(
     var creating by remember { mutableStateOf(false) }
     var songForPlaylist by remember { mutableStateOf<Song?>(null) }
     val focusManager = LocalFocusManager.current
+    var libraryMenu by remember { mutableStateOf(false) }
+    val scan by viewModel.scan.collectAsStateWithLifecycle()
+    val pickFolder = rememberFolderPicker { viewModel.setScanFolder(it.toString()) }
 
     Scaffold(
         topBar = {
@@ -154,6 +160,16 @@ fun LibraryScreen(
                     if (state.playlists.isNotEmpty()) {
                         IconButton(onClick = viewModel::syncAll) {
                             Icon(Icons.Rounded.Sync, "Actualizar playlists automáticas")
+                        }
+                    }
+                    IconButton(onClick = { libraryMenu = true }) {
+                        Icon(Icons.Rounded.MoreVert, "Más opciones")
+                        DropdownMenu(libraryMenu, { libraryMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Analizar carpeta de descargas") },
+                                leadingIcon = { Icon(Icons.Rounded.FolderOpen, null) },
+                                onClick = { libraryMenu = false; viewModel.openScan() },
+                            )
                         }
                     }
                 },
@@ -239,6 +255,8 @@ fun LibraryScreen(
             }
         }
     }
+
+    if (scan.visible) ScanDialog(scan, viewModel, onPickFolder = pickFolder)
 
     if (creating) {
         PlaylistNameDialog(
@@ -486,4 +504,59 @@ private fun UserPlaylistList(playlists: List<UserPlaylist>, onOpen: (Long) -> Un
             }
         }
     }
+}
+
+/**
+ * Diálogo para recuperar canciones ya descargadas: lee la carpeta de descargas y las vuelve a
+ * añadir a la biblioteca (útil tras reinstalar la app). Solo reconoce archivos descargados por la app.
+ */
+@Composable
+private fun ScanDialog(scan: LibraryViewModel.ScanUiState, viewModel: LibraryViewModel, onPickFolder: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { if (!scan.running) viewModel.closeScan() },
+        title = { Text("Analizar carpeta de descargas") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Busca en la carpeta las canciones que descargaste con la app y las recupera en la biblioteca " +
+                        "(por ejemplo, después de reinstalarla). No modifica ni borra tus archivos.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("Carpeta: " + readableFolder(scan.treeUri), style = MaterialTheme.typography.labelLarge)
+                if (scan.running) {
+                    LinearProgressIndicator(
+                        progress = { if (scan.total > 0) scan.done.toFloat() / scan.total else 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("Analizando ${scan.done}/${scan.total}…", style = MaterialTheme.typography.bodySmall)
+                }
+                scan.result?.let { r ->
+                    val text = buildString {
+                        append("Archivos de audio: ${r.audioFiles}\n")
+                        append("Canciones recuperadas: ${r.imported}\n")
+                        if (r.alreadyKnown > 0) append("Ya estaban en la biblioteca: ${r.alreadyKnown}\n")
+                        if (r.skipped > 0) append("Ignorados (no son de la app): ${r.skipped}\n")
+                        if (r.failed > 0) append("Con error: ${r.failed}")
+                    }.trim()
+                    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                scan.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::startScan, enabled = !scan.running && scan.treeUri != null) {
+                Text(if (scan.result != null) "Analizar de nuevo" else "Analizar")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onPickFolder, enabled = !scan.running) {
+                    Text(if (scan.treeUri == null) "Elegir carpeta" else "Cambiar carpeta")
+                }
+                TextButton(onClick = viewModel::closeScan) { Text(if (scan.running) "Cancelar" else "Cerrar") }
+            }
+        },
+    )
 }
